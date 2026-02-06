@@ -98,6 +98,36 @@ export function initApp() {
           </div>
         </section>
 
+                <section>
+          <h2>램프</h2>
+          <div class="card">
+            <div class="grid">
+              <label class="wide">
+                램프 사용
+                <input id="lampToggle" type="checkbox" />
+              </label>
+              <label class="wide">
+                조명 밝기 <span id="lampBrightnessValue">--</span>
+                <input id="lampBrightness" type="range" min="0" max="100" step="1" value="0" />
+              </label>
+              <label>
+                조명 종류
+                <select id="lampType">
+                  <option value="1">단색</option>
+                  <option value="2">촛불</option>
+                  <option value="3">오로라</option>
+                  <option value="4">파도</option>
+                  <option value="5">반딧불</option>
+                </select>
+              </label>
+              <label>
+                색상
+                <input id="lampColor" type="color" value="#ffffff" />
+              </label>
+            </div>
+          </div>
+        </section>
+
         <section>
           <h2>기기 등록</h2>
           <div class="card">
@@ -132,6 +162,11 @@ export function initApp() {
   const battery = el<HTMLDivElement>("#battery");
   const volumeSlider = el<HTMLInputElement>("#volumeSlider");
   const volumeValue = el<HTMLDivElement>("#volumeValue");
+  const lampToggle = el<HTMLInputElement>("#lampToggle");
+  const lampBrightness = el<HTMLInputElement>("#lampBrightness");
+  const lampBrightnessValue = el<HTMLSpanElement>("#lampBrightnessValue");
+  const lampType = el<HTMLSelectElement>("#lampType");
+  const lampColor = el<HTMLInputElement>("#lampColor");
   const registerList = el<HTMLSelectElement>("#registerList");
   const registeredList = el<HTMLSelectElement>("#registeredList");
   const registerButton = el<HTMLButtonElement>("#registerDevice");
@@ -146,6 +181,12 @@ export function initApp() {
   let batteryTimer: ReturnType<typeof setInterval> | null = null;
   let volumeValueState: number | null = null;
   let volumeDebounce: ReturnType<typeof setTimeout> | null = null;
+  let lampBrightnessState: number | null = null;
+  let lampTypeState = 1;
+  let lampColorState = "#ffffff";
+  let lampDebounce: ReturnType<typeof setTimeout> | null = null;
+  let lampLastNonZero = 50;
+  let lampOnState = false;
   let devEnabled = false;
   let devClicks = 0;
   let devClickTimer: ReturnType<typeof setTimeout> | null = null;
@@ -232,6 +273,71 @@ export function initApp() {
     void invoke("set_tray_battery", { percent: null, charging: false, full: false });
   }
 
+  function setLampEnabled(enabled: boolean) {
+    lampToggle.disabled = !enabled;
+    lampBrightness.disabled = !enabled;
+    lampType.disabled = !enabled;
+    lampColor.disabled = !enabled;
+  }
+
+  function updateLampUI() {
+    if (lampBrightnessState === null) {
+      lampBrightnessValue.textContent = "--";
+      lampBrightness.value = "0";
+    } else {
+      lampBrightnessValue.textContent = String(lampBrightnessState);
+      lampBrightness.value = String(lampBrightnessState);
+    }
+    lampToggle.checked = lampOnState;
+    lampType.value = String(lampTypeState);
+    lampColor.value = lampColorState;
+    setLampEnabled(connectionState === "connected");
+  }
+
+  function parseColorHex(hex: string) {
+    const value = hex.replace("#", "");
+    if (value.length !== 6) return [255, 255, 255];
+    const r = parseInt(value.slice(0, 2), 16);
+    const g = parseInt(value.slice(2, 4), 16);
+    const b = parseInt(value.slice(4, 6), 16);
+    return [r, g, b];
+  }
+
+  async function requestLampState() {
+    try {
+      await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0411, payload: [] });
+      logLine("Lamp request (5054 0411)", "OUT");
+    } catch (err) {
+      logLine(String(err), "SYS");
+    }
+  }
+
+  async function setLampBrightness(value: number) {
+    await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0202, payload: [value] });
+  }
+
+  async function setLampType(value: number) {
+    await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0203, payload: [value] });
+  }
+
+  async function setLampColor(value: string) {
+    const [r, g, b] = parseColorHex(value);
+    await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0204, payload: [r, g, b] });
+  }
+
+  async function runLamp(mood: number, type: number, color: string) {
+    const [r, g, b] = parseColorHex(color);
+    await invoke("send_gaia_command", {
+      vendorId: 0x5054,
+      commandId: 0x0212,
+      payload: [mood, type, r, g, b],
+    });
+  }
+
+  async function stopLamp() {
+    await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0213, payload: [] });
+  }
+
   function setVolumeEnabled(enabled: boolean) {
     volumeSlider.disabled = !enabled;
   }
@@ -269,9 +375,11 @@ export function initApp() {
     setConnectionState("connected", address);
     requestBattery().catch((err) => logLine(String(err), "SYS"));
     requestVolume().catch((err) => logLine(String(err), "SYS"));
+    requestLampState().catch((err) => logLine(String(err), "SYS"));
     stopBatteryPolling();
     batteryTimer = setInterval(requestBattery, 30_000);
     setVolumeEnabled(true);
+    setLampEnabled(true);
   }
 
   function setDisconnected() {
@@ -279,6 +387,9 @@ export function initApp() {
     resetBatteryState();
     updateVolumeUI(null);
     setVolumeEnabled(false);
+    lampBrightnessState = null;
+    lampOnState = false;
+    updateLampUI();
     setConnectionState("idle", null);
   }
 
@@ -556,6 +667,7 @@ export function initApp() {
   battery.addEventListener("click", requestBattery);
   setVolumeEnabled(false);
   updateVolumeUI(null);
+  updateLampUI();
   volumeSlider.addEventListener("input", () => {
     if (volumeSlider.disabled) return;
     const value = Number(volumeSlider.value);
@@ -566,6 +678,58 @@ export function initApp() {
     volumeDebounce = setTimeout(() => {
       setVolume(value);
     }, 150);
+  });
+  lampToggle.addEventListener("change", () => {
+    if (lampToggle.disabled) return;
+    const current = lampBrightnessState ?? 0;
+    const nextValue = lampToggle.checked
+      ? (current > 0 ? current : lampLastNonZero)
+      : 0;
+    lampBrightnessState = nextValue;
+    if (nextValue > 0) {
+      lampLastNonZero = nextValue;
+    }
+    lampOnState = lampToggle.checked;
+    updateLampUI();
+    if (lampOnState) {
+      runLamp(nextValue, lampTypeState, lampColorState).catch((err) => logLine(String(err), "SYS"));
+    } else {
+      stopLamp().catch((err) => logLine(String(err), "SYS"));
+    }
+  });
+  lampBrightness.addEventListener("input", () => {
+    if (lampBrightness.disabled) return;
+    const value = Number(lampBrightness.value);
+    lampBrightnessState = value;
+    if (value > 0) {
+      lampLastNonZero = value;
+    }
+    updateLampUI();
+    if (lampDebounce) {
+      clearTimeout(lampDebounce);
+    }
+    lampDebounce = setTimeout(() => {
+      if (!lampOnState) return;
+      setLampBrightness(value).catch((err) => logLine(String(err), "SYS"));
+    }, 150);
+  });
+  lampType.addEventListener("change", () => {
+    if (lampType.disabled) return;
+    const value = Number(lampType.value);
+    lampTypeState = value;
+    if (!lampOnState) return;
+    setLampType(value).catch((err) => logLine(String(err), "SYS"));
+    if (value === 1) {
+      setLampColor(lampColorState).catch((err) => logLine(String(err), "SYS"));
+    }
+  });
+  lampColor.addEventListener("input", () => {
+    if (lampColor.disabled) return;
+    lampColorState = lampColor.value;
+    if (!lampOnState) return;
+    if (lampTypeState === 1) {
+      setLampColor(lampColorState).catch((err) => logLine(String(err), "SYS"));
+    }
   });
   registerButton.addEventListener("click", registerDevice);
   appTitle.addEventListener("click", onDevClick);
@@ -643,6 +807,20 @@ export function initApp() {
     if (p.vendor_id === 0x5054 && p.command === 0x0401 && p.ack) {
       if (dataPayload.length >= 1) {
         updateVolumeUI(dataPayload[0]);
+      }
+    }
+    if (p.vendor_id === 0x5054 && p.command === 0x0411 && p.ack) {
+      if (dataPayload.length >= 6) {
+        lampOnState = dataPayload[0] === 1;
+        lampBrightnessState = dataPayload[1];
+        const type = dataPayload[2];
+        lampTypeState = type >= 1 && type <= 5 ? type : 1;
+        const [r, g, b] = dataPayload.slice(3, 6);
+        lampColorState = `#${toHex(r, 2)}${toHex(g, 2)}${toHex(b, 2)}`;
+        if (lampBrightnessState > 0) {
+          lampLastNonZero = lampBrightnessState;
+        }
+        updateLampUI();
       }
     }
     const payloadText = p.payload.length
