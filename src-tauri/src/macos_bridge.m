@@ -131,22 +131,15 @@ static void runOnMainSync(void (^block)(void)) {
     BTLOG(@"Connect start: %@ (%@)", device.name, device.addressString);
 
     if ([device isConnected]) {
-        self.lastErrorContext = @"wait_disconnect";
-        BTLOG(@"Wait for disconnect: %@", device.addressString);
-        [device closeConnection];
-        BOOL down = [self waitForDisconnection:device timeout:2.0];
-        BTLOG(@"Disconnect complete: %@", down ? @"YES" : @"NO");
-        if (!down) {
-            self.lastErrorContext = @"still_connected";
-            return kIOReturnBusy;
-        }
+        self.lastErrorContext = @"already_connected";
+        BTLOG(@"Already connected: %@", device.addressString);
+    } else {
+        self.lastErrorContext = @"open_connection";
+        IOReturn linkStatus = [device openConnection];
+        BTLOG(@"Link request: status=%d", (int)linkStatus);
+        BOOL linkUp = [self waitForConnection:device timeout:3.0];
+        BTLOG(@"Link connected: %@", linkUp ? @"YES" : @"NO");
     }
-
-    self.lastErrorContext = @"open_connection";
-    IOReturn linkStatus = [device openConnection];
-    BTLOG(@"Link request: status=%d", (int)linkStatus);
-    BOOL linkUp = [self waitForConnection:device timeout:3.0];
-    BTLOG(@"Link connected: %@", linkUp ? @"YES" : @"NO");
 
     NSMutableArray<NSNumber *> *candidates = [NSMutableArray array];
     self.lastErrorContext = @"sdp_query";
