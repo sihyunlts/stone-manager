@@ -3,6 +3,7 @@
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::ffi::{CStr, CString};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, Wry, WindowEvent};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
@@ -24,6 +25,13 @@ struct GaiaPacketEvent {
     flags: u8,
     payload: Vec<u8>,
     status: Option<u8>,
+}
+
+#[derive(Serialize, Clone)]
+struct ConnectionInfo {
+    address: String,
+    link: bool,
+    rfcomm: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -190,6 +198,7 @@ static PARSER: OnceCell<Mutex<GaiaParser>> = OnceCell::new();
 static TRAY: OnceCell<TrayIcon<Wry>> = OnceCell::new();
 static TRAY_MENU: OnceCell<Menu<Wry>> = OnceCell::new();
 static TRAY_BATTERY_ITEM: OnceCell<MenuItem<Wry>> = OnceCell::new();
+static CONNECT_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 
 fn get_parser() -> &'static Mutex<GaiaParser> {
     PARSER.get_or_init(|| Mutex::new(GaiaParser::new()))
@@ -202,6 +211,7 @@ extern "C" {
     fn macos_bt_disconnect();
     fn macos_bt_write(data: *const u8, len: usize) -> i32;
     fn macos_bt_last_error_context() -> *mut std::os::raw::c_char;
+    fn macos_bt_get_connection_info() -> *mut std::os::raw::c_char;
 }
 
 #[no_mangle]
@@ -262,29 +272,60 @@ async fn list_devices() -> Result<Vec<BluetoothDeviceInfo>, String> {
 }
 
 #[tauri::command]
-async fn connect_device(address: String) -> Result<(), String> {
+async fn get_connection_info() -> Result<ConnectionInfo, String> {
     #[cfg(target_os = "macos")]
     {
-        connect_device_inner(address).await
+        let ptr = unsafe { macos_bt_get_connection_info() };
+        if ptr.is_null() {
+            return Ok(ConnectionInfo {
+                address: "".to_string(),
+                link: false,
+                rfcomm: false,
+            });
+        }
+        let json = unsafe { CString::from_raw(ptr) }
+            .into_string()
+            .map_err(|_| "Invalid connection info encoding".to_string())?;
+        let value: serde_json::Value = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+        let address = value
+            .get("address")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let link = value
+            .get("link")
+            .and_then(|v| v.as_bool().or_else(|| v.as_i64().map(|n| n != 0)))
+            .unwrap_or(false);
+        let rfcomm = value
+            .get("rfcomm")
+            .and_then(|v| v.as_bool().or_else(|| v.as_i64().map(|n| n != 0)))
+            .unwrap_or(false);
+        Ok(ConnectionInfo {
+            address,
+            link,
+            rfcomm,
+        })
     }
 
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = address;
         Err("Not supported on this platform".to_string())
     }
 }
-
 #[tauri::command]
 async fn connect_device_async(address: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
+        if CONNECT_IN_FLIGHT.swap(true, Ordering::SeqCst) {
+            return Err("Connect already in progress".to_string());
+        }
         let app = APP_HANDLE
             .get()
             .cloned()
             .ok_or_else(|| "App not ready".to_string())?;
         tauri::async_runtime::spawn(async move {
             let result = connect_device_inner(address.clone()).await;
+            CONNECT_IN_FLIGHT.store(false, Ordering::SeqCst);
             let payload = match result {
                 Ok(()) => ConnectResult {
                     address,
@@ -493,7 +534,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             list_devices,
-            connect_device,
+            get_connection_info,
             connect_device_async,
             disconnect_device,
             send_gaia_command,

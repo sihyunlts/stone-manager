@@ -22,6 +22,12 @@ type DeviceStateEvent = {
   connected: boolean;
 };
 
+type ConnectionInfo = {
+  address: string;
+  link: boolean;
+  rfcomm: boolean;
+};
+
 type DeviceInfo = {
   name: string;
   address: string;
@@ -137,15 +143,31 @@ export function initApp() {
     return device.name || address;
   }
 
+  function stopBatteryPolling() {
+    if (batteryTimer) {
+      clearInterval(batteryTimer);
+      batteryTimer = null;
+    }
+  }
+
   function resetBatteryState() {
     battery.textContent = "배터리: --";
     lastBatteryStep = null;
     lastDcState = null;
     void invoke("set_tray_battery", { percent: null, charging: false, full: false });
-    if (batteryTimer) {
-      clearInterval(batteryTimer);
-      batteryTimer = null;
-    }
+  }
+
+  function setConnected(address: string) {
+    setConnectionState("connected", address);
+    requestBattery().catch((err) => logLine(String(err), "SYS"));
+    stopBatteryPolling();
+    batteryTimer = setInterval(requestBattery, 30_000);
+  }
+
+  function setDisconnected() {
+    stopBatteryPolling();
+    resetBatteryState();
+    setConnectionState("idle", null);
   }
 
   function updateConnectionStatus() {
@@ -207,10 +229,31 @@ export function initApp() {
     renderDeviceList();
   }
 
+  async function syncBackendConnection() {
+    try {
+      const info = await invoke<ConnectionInfo>("get_connection_info");
+      if (info.rfcomm && info.address) {
+        setConnected(info.address);
+      } else if (connectionState === "connected") {
+        setDisconnected();
+      }
+    } catch (err) {
+      logLine(String(err), "SYS");
+    }
+  }
+
   async function connect() {
     const address = deviceList.value;
     if (!address) {
       logLine("Select a device first", "SYS");
+      return;
+    }
+    if (connectionState === "connecting" || connectionState === "disconnecting") {
+      logLine("Connect already in progress", "SYS");
+      return;
+    }
+    if (connectionState === "connected" && connectedAddress === address) {
+      logLine("Already connected", "SYS");
       return;
     }
     try {
@@ -226,8 +269,7 @@ export function initApp() {
     try {
       setConnectionState("disconnecting", connectedAddress);
       await invoke("disconnect_device");
-      resetBatteryState();
-      setConnectionState("idle", null);
+      setDisconnected();
       logLine("Disconnected", "SYS");
     } catch (err) {
       logLine(String(err), "SYS");
@@ -327,15 +369,11 @@ export function initApp() {
     const result = event.payload;
     const device = devices.find((d) => d.address === result.address);
     if (result.ok) {
-      setConnectionState("connected", result.address);
+      setConnected(result.address);
       logLine(`Connected to ${device?.name ?? result.address}`, "SYS");
-      requestBattery().catch((err) => logLine(String(err), "SYS"));
-      if (batteryTimer) clearInterval(batteryTimer);
-      batteryTimer = setInterval(requestBattery, 30_000);
     } else {
       if (connectedAddress === result.address) {
-        resetBatteryState();
-        setConnectionState("idle", null);
+        setDisconnected();
       } else {
         setConnectionState("idle", connectedAddress);
       }
@@ -353,8 +391,10 @@ export function initApp() {
       refreshDevices().catch((err) => logLine(String(err), "SYS"));
     }
     if (connectedAddress === address && !connected) {
-      resetBatteryState();
-      setConnectionState("idle", null);
+      if (connectionState === "connecting") {
+        return;
+      }
+      setDisconnected();
     }
   });
 
@@ -383,5 +423,7 @@ export function initApp() {
     );
   });
 
-  refreshDevices().catch((err) => logLine(String(err), "SYS"));
+  refreshDevices()
+    .then(syncBackendConnection)
+    .catch((err) => logLine(String(err), "SYS"));
 }

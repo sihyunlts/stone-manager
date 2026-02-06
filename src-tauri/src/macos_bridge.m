@@ -30,6 +30,21 @@ static void runOnMainSync(void (^block)(void)) {
     dispatch_sync(dispatch_get_main_queue(), block);
 }
 
+- (void)connectionComplete:(IOBluetoothDevice *)device status:(IOReturn)status {
+    (void)device;
+    (void)status;
+}
+
+- (void)remoteNameRequestComplete:(IOBluetoothDevice *)device status:(IOReturn)status {
+    (void)device;
+    (void)status;
+}
+
+- (void)sdpQueryComplete:(IOBluetoothDevice *)device status:(IOReturn)status {
+    (void)device;
+    (void)status;
+}
+
 + (instancetype)shared {
     static StoneBluetoothManager *instance = nil;
     static dispatch_once_t onceToken;
@@ -95,30 +110,15 @@ static void runOnMainSync(void (^block)(void)) {
     }
 }
 
-- (void)connectionComplete:(IOBluetoothDevice *)device status:(IOReturn)status {}
-- (void)remoteNameRequestComplete:(IOBluetoothDevice *)device status:(IOReturn)status {}
-
-- (void)sdpQueryComplete:(IOBluetoothDevice *)device status:(IOReturn)status {
-    (void)device;
-    (void)status;
-}
-
-- (BOOL)waitForConnection:(IOBluetoothDevice *)device timeout:(NSTimeInterval)timeout {
+- (BOOL)waitForDevice:(IOBluetoothDevice *)device
+            connected:(BOOL)connected
+              timeout:(NSTimeInterval)timeout {
     NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
-    while (![device isConnected] && [deadline timeIntervalSinceNow] > 0) {
+    while (([device isConnected] != connected) && [deadline timeIntervalSinceNow] > 0) {
         [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
                                  beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
     }
-    return [device isConnected];
-}
-
-- (BOOL)waitForDisconnection:(IOBluetoothDevice *)device timeout:(NSTimeInterval)timeout {
-    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
-    while ([device isConnected] && [deadline timeIntervalSinceNow] > 0) {
-        [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
-                                 beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
-    }
-    return ![device isConnected];
+    return [device isConnected] == connected;
 }
 
 - (IOReturn)openRFCOMMChannelAndWait:(IOBluetoothDevice *)device
@@ -134,9 +134,7 @@ static void runOnMainSync(void (^block)(void)) {
         if (startStatus != kIOReturnSuccess) {
             dispatch_semaphore_signal(sema);
         } else {
-            // Store semaphore and temporary channel in associated objects.
             objc_setAssociatedObject(self, @"stone_rfcomm_sema", (id)sema, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            objc_setAssociatedObject(self, @"stone_rfcomm_channel", openedChannel, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
     });
 
@@ -168,7 +166,15 @@ static void runOnMainSync(void (^block)(void)) {
 
 - (IOReturn)connectToAddress:(NSString *)address {
     [self ensureConnectionNotifications];
-    [self disconnect];
+    if (self.device && address.length > 0) {
+        if ([self.device.addressString caseInsensitiveCompare:address] != NSOrderedSame) {
+            if (![self disconnectWithTimeout:4.0]) {
+                self.lastErrorContext = @"disconnect_timeout";
+                BTLOG(@"Disconnect timeout before connect");
+                return kIOReturnBusy;
+            }
+        }
+    }
 
     IOBluetoothDevice *device = [IOBluetoothDevice deviceWithAddressString:address];
     if (!device) {
@@ -190,48 +196,70 @@ static void runOnMainSync(void (^block)(void)) {
     self.lastErrorContext = @"connect_start";
     BTLOG(@"Connect start: %@ (%@)", device.name, device.addressString);
 
-    if ([device isConnected]) {
-        self.lastErrorContext = @"already_connected";
-        BTLOG(@"Already connected: %@", device.addressString);
-    } else {
-        self.lastErrorContext = @"open_connection";
-        IOReturn linkStatus = [device openConnection];
-        BTLOG(@"Link request: status=%d", (int)linkStatus);
-        BOOL linkUp = [self waitForConnection:device timeout:3.0];
-        BTLOG(@"Link connected: %@", linkUp ? @"YES" : @"NO");
+    if (self.channel && [self.channel isOpen] &&
+        [self.device.addressString caseInsensitiveCompare:address] == NSOrderedSame) {
+        self.lastErrorContext = @"rfcomm_already_open";
+        BTLOG(@"RFCOMM already open: %@", device.addressString);
+        return kIOReturnSuccess;
     }
 
-    NSMutableArray<NSNumber *> *candidates = [NSMutableArray array];
+    BOOL wasConnected = [device isConnected];
+    if (wasConnected && !self.channel) {
+        self.lastErrorContext = @"preconnect_link_reset";
+        BTLOG(@"Resetting existing link before connect: %@", device.addressString);
+        [device closeConnection];
+        BOOL down = [self waitForDevice:device connected:NO timeout:4.0];
+        BTLOG(@"Pre-connect disconnect: %@", down ? @"YES" : @"NO");
+        if (!down) {
+            self.lastErrorContext = @"disconnect_timeout";
+            return kIOReturnBusy;
+        }
+        wasConnected = [device isConnected];
+    }
+    if (wasConnected) {
+        self.lastErrorContext = @"already_connected";
+        BTLOG(@"Already connected: %@", device.addressString);
+    }
+
+    self.lastErrorContext = @"open_connection";
+    IOReturn linkStatus = [device openConnection];
+    BTLOG(@"Link request: status=%d", (int)linkStatus);
+    BOOL linkUp = [self waitForDevice:device connected:YES timeout:3.0];
+    BTLOG(@"Link connected: %@", linkUp ? @"YES" : @"NO");
+
     self.lastErrorContext = @"sdp_query";
     IOReturn sdpKick = [device performSDPQuery:nil];
     BTLOG(@"SDP query kick: status=%d", (int)sdpKick);
 
     self.lastErrorContext = @"resolve_channel";
-    BluetoothRFCOMMChannelID resolved = [self resolveRFCOMMChannel:device];
+    BluetoothRFCOMMChannelID resolved = 0;
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:3.0];
+    while ([deadline timeIntervalSinceNow] > 0) {
+        resolved = [self resolveRFCOMMChannel:device];
+        if (resolved != 0) {
+            break;
+        }
+        [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
+                                 beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
+    }
 
     if (resolved != 0) {
-        [candidates addObject:@(resolved)];
         BTLOG(@"GAIA channel: %d", (int)resolved);
     } else {
         BTLOG(@"GAIA channel: NOT FOUND");
+        self.lastErrorContext = @"gaia_not_found";
+        return kIOReturnNotFound;
     }
 
-    self.lastErrorContext = @"open_rfcomm_candidates";
-    IOReturn status = kIOReturnError;
-    for (NSNumber *candidate in candidates) {
-        BluetoothRFCOMMChannelID cid = (BluetoothRFCOMMChannelID)candidate.unsignedCharValue;
-        if (cid == 0) {
-            continue;
-        }
-        BTLOG(@"Open RFCOMM: ch=%d", (int)cid);
-        status = [self openRFCOMMChannelAndWait:device channelID:cid timeout:4.0];
-        if (status == kIOReturnSuccess) {
-            self.lastErrorContext = @"connected";
-            BTLOG(@"RFCOMM connected: ch=%d", (int)cid);
-            return kIOReturnSuccess;
-        }
-        BTLOG(@"RFCOMM open failed: ch=%d status=%d", (int)cid, (int)status);
+    self.lastErrorContext = @"open_rfcomm";
+    BTLOG(@"Open RFCOMM: ch=%d", (int)resolved);
+    IOReturn status = [self openRFCOMMChannelAndWait:device channelID:resolved timeout:4.0];
+    if (status == kIOReturnSuccess) {
+        self.lastErrorContext = @"connected";
+        BTLOG(@"RFCOMM connected: ch=%d", (int)resolved);
+        return kIOReturnSuccess;
     }
+    BTLOG(@"RFCOMM open failed: ch=%d status=%d", (int)resolved, (int)status);
 
     self.lastErrorContext = @"open_rfcomm_failed";
     BTLOG(@"RFCOMM open failed: status=%d", (int)status);
@@ -239,6 +267,11 @@ static void runOnMainSync(void (^block)(void)) {
 }
 
 - (void)disconnect {
+    [self disconnectWithTimeout:2.0];
+    self.device = nil;
+}
+
+- (BOOL)disconnectWithTimeout:(NSTimeInterval)timeout {
     IOBluetoothDevice *device = self.device;
     IOBluetoothRFCOMMChannel *channel = self.channel;
     NSString *addr = device.addressString;
@@ -253,10 +286,11 @@ static void runOnMainSync(void (^block)(void)) {
     if (device) {
         BTLOG(@"Link close: %@", addr);
         [device closeConnection];
-        BOOL down = [self waitForDisconnection:device timeout:2.0];
+        BOOL down = [self waitForDevice:device connected:NO timeout:timeout];
         BTLOG(@"Link disconnected: %@ (%@)", down ? @"YES" : @"NO", addr ?: @"");
+        return down;
     }
-    self.device = nil;
+    return YES;
 }
 
 - (IOReturn)sendData:(NSData *)data {
@@ -356,6 +390,33 @@ char *macos_bt_list_paired_devices(void) {
         return strdup("[]");
     }
     return result;
+}
+
+char *macos_bt_get_connection_info(void) {
+    StoneBluetoothManager *manager = [StoneBluetoothManager shared];
+    NSString *address = @"";
+    BOOL link = NO;
+    BOOL rfcomm = NO;
+
+    if (manager.device) {
+        address = manager.device.addressString ?: @"";
+        link = [manager.device isConnected] ? YES : NO;
+    }
+    if (manager.channel) {
+        rfcomm = [manager.channel isOpen];
+    }
+
+    NSDictionary *info = @{ @"address": address, @"link": @(link), @"rfcomm": @(rfcomm) };
+    NSError *error = nil;
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:info options:0 error:&error];
+    if (!jsonData || error) {
+        return strdup("{\"address\":\"\",\"link\":false,\"rfcomm\":false}");
+    }
+    NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+    if (!jsonString) {
+        return strdup("{\"address\":\"\",\"link\":false,\"rfcomm\":false}");
+    }
+    return strdup([jsonString UTF8String]);
 }
 
 int macos_bt_connect(const char *address) {
