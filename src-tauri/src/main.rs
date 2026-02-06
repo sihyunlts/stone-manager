@@ -4,7 +4,7 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::ffi::CString;
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, Manager, Wry};
+use tauri::{AppHandle, Emitter, Manager, Wry, WindowEvent};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{TrayIcon, TrayIconBuilder};
 
@@ -369,6 +369,16 @@ fn main() {
     tauri::Builder::default()
         .setup(|app| {
             let _ = APP_HANDLE.set(app.handle().clone());
+            let _ = app.set_dock_visibility(false);
+            if let Some(window) = app.get_webview_window("main") {
+                let window_handle = window.clone();
+                window.on_window_event(move |event| {
+                    if let WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = window_handle.hide();
+                    }
+                });
+            }
             if let Some(icon) = app.default_window_icon().cloned() {
                 let battery_item = MenuItem::with_id(app, "battery", "배터리: --", false, None::<&str>)
                 .ok();
