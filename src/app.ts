@@ -97,12 +97,6 @@ export function initApp() {
           </div>
         </section>
 
-        <section>
-          <h2>로그</h2>
-          <div class="card log">
-            <div id="log"></div>
-          </div>
-        </section>
       </main>
     </div>
   `;
@@ -110,18 +104,14 @@ export function initApp() {
   const status = el<HTMLDivElement>("#status");
   const battery = el<HTMLDivElement>("#battery");
   const deviceList = el<HTMLSelectElement>("#deviceList");
-  const log = el<HTMLDivElement>("#log");
   const showAll = el<HTMLInputElement>("#showAll");
   let devices: DeviceInfo[] = [];
   let lastBatteryStep: number | null = null;
   let lastDcState: number | null = null;
   let batteryTimer: ReturnType<typeof setInterval> | null = null;
 
-  function logLine(line: string, tone: "in" | "out" | "sys" = "sys") {
-    const div = document.createElement("div");
-    div.className = `log-line ${tone}`;
-    div.textContent = line;
-    log.prepend(div);
+  function logLine(line: string, tone: "IN" | "OUT" | "SYS" = "SYS") {
+    void invoke("log_line", { line, tone, ts: "" });
   }
 
   function renderDeviceList() {
@@ -150,7 +140,7 @@ export function initApp() {
   async function connect() {
     const address = deviceList.value;
     if (!address) {
-      logLine("Select a device first", "sys");
+      logLine("Select a device first", "SYS");
       return;
     }
     try {
@@ -158,12 +148,12 @@ export function initApp() {
       const device = devices.find((d) => d.address === address);
       status.textContent = device ? `Connected: ${device.name}` : `Connected: ${address}`;
       status.classList.add("connected");
-      logLine(`Connected to ${device?.name ?? address}`, "sys");
+      logLine(`Connected to ${device?.name ?? address}`, "SYS");
       await requestBattery();
       if (batteryTimer) clearInterval(batteryTimer);
       batteryTimer = setInterval(requestBattery, 30_000);
     } catch (err) {
-      logLine(String(err), "sys");
+      logLine(String(err), "SYS");
     }
   }
 
@@ -179,9 +169,9 @@ export function initApp() {
         clearInterval(batteryTimer);
         batteryTimer = null;
       }
-      logLine("Disconnected", "sys");
+      logLine("Disconnected", "SYS");
     } catch (err) {
-      logLine(String(err), "sys");
+      logLine(String(err), "SYS");
     }
   }
 
@@ -189,9 +179,9 @@ export function initApp() {
     try {
       await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0455, payload: [] });
       await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0456, payload: [] });
-      logLine("→ Battery request (5054 0455)", "out");
+      logLine("Battery request (5054 0455)", "OUT");
     } catch (err) {
-      logLine(String(err), "sys");
+      logLine(String(err), "SYS");
     }
   }
 
@@ -239,7 +229,7 @@ export function initApp() {
     const vendorId = parseInt(vendorIdHex, 16);
     const commandId = parseInt(commandIdHex, 16);
     if (Number.isNaN(vendorId) || Number.isNaN(commandId)) {
-      logLine("Invalid vendor or command id", "sys");
+      logLine("Invalid vendor or command id", "SYS");
       return;
     }
 
@@ -247,7 +237,7 @@ export function initApp() {
     try {
       payload = parseHexBytes(payloadHex);
     } catch (err) {
-      logLine(String(err), "sys");
+      logLine(String(err), "SYS");
       return;
     }
 
@@ -256,9 +246,9 @@ export function initApp() {
       const payloadText = payload.length
         ? payload.map((b) => toHex(b, 2)).join(" ")
         : "<empty>";
-      logLine(`→ ${toHex(vendorId, 4)} ${toHex(commandId, 4)} ${payloadText}`, "out");
+      logLine(`${toHex(vendorId, 4)} ${toHex(commandId, 4)} ${payloadText}`, "OUT");
     } catch (err) {
-      logLine(String(err), "sys");
+      logLine(String(err), "SYS");
     }
   }
 
@@ -288,10 +278,10 @@ export function initApp() {
       : "<empty>";
     const statusText = p.status !== null && p.status !== undefined ? ` status=${p.status}` : "";
     logLine(
-      `← ${toHex(p.vendor_id, 4)} ${toHex(p.command_id, 4)}${p.ack ? " ACK" : ""}${statusText} ${payloadText}`,
-      "in"
+      `${toHex(p.vendor_id, 4)} ${toHex(p.command_id, 4)}${p.ack ? " ACK" : ""}${statusText} ${payloadText}`,
+      "IN"
     );
   });
 
-  refreshDevices().catch((err) => logLine(String(err), "sys"));
+  refreshDevices().catch((err) => logLine(String(err), "SYS"));
 }

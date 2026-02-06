@@ -5,6 +5,10 @@
 #import <IOBluetooth/objc/IOBluetoothSDPServiceRecord.h>
 #import <objc/runtime.h>
 
+#define BTLOG(fmt, ...) do { \
+    NSLog((@"[STONE][BACK][BT] " fmt), ##__VA_ARGS__); \
+} while(0)
+
 extern void macos_bt_on_data(const uint8_t *data, size_t len);
 
 @interface StoneBluetoothManager : NSObject <IOBluetoothDeviceAsyncCallbacks, IOBluetoothRFCOMMChannelDelegate>
@@ -118,20 +122,20 @@ static void runOnMainSync(void (^block)(void)) {
 
     if (!device) {
         self.lastErrorContext = @"device_not_found";
-        NSLog(@"[Stone][BT] Device not found: %@", address);
+        BTLOG(@"Device not found: %@", address);
         return kIOReturnNotFound;
     }
 
     self.device = device;
     self.lastErrorContext = @"connect_start";
-    NSLog(@"[Stone][BT] Connect start: %@ (%@)", device.name, device.addressString);
+    BTLOG(@"Connect start: %@ (%@)", device.name, device.addressString);
 
     if ([device isConnected]) {
         self.lastErrorContext = @"wait_disconnect";
-        NSLog(@"[Stone][BT] Wait for disconnect: %@", device.addressString);
+        BTLOG(@"Wait for disconnect: %@", device.addressString);
         [device closeConnection];
         BOOL down = [self waitForDisconnection:device timeout:2.0];
-        NSLog(@"[Stone][BT] Disconnect complete: %@", down ? @"YES" : @"NO");
+        BTLOG(@"Disconnect complete: %@", down ? @"YES" : @"NO");
         if (!down) {
             self.lastErrorContext = @"still_connected";
             return kIOReturnBusy;
@@ -143,9 +147,9 @@ static void runOnMainSync(void (^block)(void)) {
     runOnMainSync(^{
         linkStatus = [device openConnection];
     });
-    NSLog(@"[Stone][BT] Link request: status=%d", (int)linkStatus);
+    BTLOG(@"Link request: status=%d", (int)linkStatus);
     BOOL linkUp = [self waitForConnection:device timeout:3.0];
-    NSLog(@"[Stone][BT] Link connected: %@", linkUp ? @"YES" : @"NO");
+    BTLOG(@"Link connected: %@", linkUp ? @"YES" : @"NO");
 
     NSMutableArray<NSNumber *> *candidates = [NSMutableArray array];
     self.lastErrorContext = @"sdp_query";
@@ -153,7 +157,7 @@ static void runOnMainSync(void (^block)(void)) {
     runOnMainSync(^{
         sdpKick = [device performSDPQuery:nil];
     });
-    NSLog(@"[Stone][BT] SDP query kick: status=%d", (int)sdpKick);
+    BTLOG(@"SDP query kick: status=%d", (int)sdpKick);
 
     self.lastErrorContext = @"resolve_channel";
     __block BluetoothRFCOMMChannelID resolved = 0;
@@ -163,9 +167,9 @@ static void runOnMainSync(void (^block)(void)) {
 
     if (resolved != 0) {
         [candidates addObject:@(resolved)];
-        NSLog(@"[Stone][BT] GAIA channel: %d", (int)resolved);
+        BTLOG(@"GAIA channel: %d", (int)resolved);
     } else {
-        NSLog(@"[Stone][BT] GAIA channel: NOT FOUND");
+        BTLOG(@"GAIA channel: NOT FOUND");
     }
 
     self.lastErrorContext = @"open_rfcomm_candidates";
@@ -175,18 +179,18 @@ static void runOnMainSync(void (^block)(void)) {
         if (cid == 0) {
             continue;
         }
-        NSLog(@"[Stone][BT] Open RFCOMM: ch=%d", (int)cid);
+        BTLOG(@"Open RFCOMM: ch=%d", (int)cid);
         status = [self openRFCOMMChannelAndWait:device channelID:cid timeout:4.0];
         if (status == kIOReturnSuccess) {
             self.lastErrorContext = @"connected";
-            NSLog(@"[Stone][BT] RFCOMM connected: ch=%d", (int)cid);
+            BTLOG(@"RFCOMM connected: ch=%d", (int)cid);
             return kIOReturnSuccess;
         }
-        NSLog(@"[Stone][BT] RFCOMM open failed: ch=%d status=%d", (int)cid, (int)status);
+        BTLOG(@"RFCOMM open failed: ch=%d status=%d", (int)cid, (int)status);
     }
 
     self.lastErrorContext = @"open_rfcomm_failed";
-    NSLog(@"[Stone][BT] RFCOMM open failed: status=%d", (int)status);
+    BTLOG(@"RFCOMM open failed: status=%d", (int)status);
     return status;
 }
 
@@ -196,19 +200,19 @@ static void runOnMainSync(void (^block)(void)) {
     NSString *addr = device.addressString;
 
     if (channel) {
-        NSLog(@"[Stone][BT] RFCOMM close");
+        BTLOG(@"RFCOMM close");
         runOnMainSync(^{
             [channel closeChannel];
         });
         self.channel = nil;
     }
     if (device) {
-        NSLog(@"[Stone][BT] Link close: %@", addr);
+        BTLOG(@"Link close: %@", addr);
         runOnMainSync(^{
             [device closeConnection];
         });
         BOOL down = [self waitForDisconnection:device timeout:2.0];
-        NSLog(@"[Stone][BT] Link disconnected: %@ (%@)", down ? @"YES" : @"NO", addr ?: @"");
+        BTLOG(@"Link disconnected: %@ (%@)", down ? @"YES" : @"NO", addr ?: @"");
     }
     self.device = nil;
 }

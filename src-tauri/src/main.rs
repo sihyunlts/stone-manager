@@ -166,6 +166,10 @@ fn ioreturn_name(code: i32) -> &'static str {
     }
 }
 
+fn back_log(source: &str, message: String) {
+    println!("[STONE][BACK][{}] {}", source, message);
+}
+
 static APP_HANDLE: OnceCell<AppHandle> = OnceCell::new();
 static PARSER: OnceCell<Mutex<GaiaParser>> = OnceCell::new();
 
@@ -204,7 +208,7 @@ pub extern "C" fn macos_bt_on_data(data: *const u8, len: usize) {
 async fn list_devices() -> Result<Vec<BluetoothDeviceInfo>, String> {
     #[cfg(target_os = "macos")]
     {
-        println!("[Stone][BT] List devices");
+        back_log("RUST", "List devices".to_string());
         let ptr = unsafe { macos_bt_list_paired_devices() };
         if ptr.is_null() {
             return Ok(Vec::new());
@@ -226,7 +230,7 @@ async fn list_devices() -> Result<Vec<BluetoothDeviceInfo>, String> {
 async fn connect_device(address: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        println!("[Stone][BT] Connect request: {}", address);
+        back_log("RUST", format!("Connect request: {}", address));
         let status = tauri::async_runtime::spawn_blocking(move || -> Result<i32, String> {
             let cstr = CString::new(address).map_err(|_| "Invalid address".to_string())?;
             Ok(unsafe { macos_bt_connect(cstr.as_ptr()) })
@@ -270,7 +274,7 @@ async fn connect_device(address: String) -> Result<(), String> {
 async fn disconnect_device() -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        println!("[Stone][BT] Disconnect request");
+        back_log("RUST", "Disconnect request".to_string());
         tauri::async_runtime::spawn_blocking(move || unsafe { macos_bt_disconnect() })
             .await
             .map_err(|_| "Join error".to_string())?;
@@ -287,11 +291,14 @@ async fn disconnect_device() -> Result<(), String> {
 async fn send_gaia_command(vendor_id: u16, command_id: u16, payload: Vec<u8>) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        println!(
-            "[Stone][BT] Send GAIA command: vendor=0x{:04X} cmd=0x{:04X} len={}",
-            vendor_id,
-            command_id,
-            payload.len()
+        back_log(
+            "RUST",
+            format!(
+                "Send GAIA command: vendor=0x{:04X} cmd=0x{:04X} len={}",
+                vendor_id,
+                command_id,
+                payload.len()
+            ),
         );
         let status = tauri::async_runtime::spawn_blocking(move || -> Result<i32, String> {
             let frame = gaia_frame(vendor_id, command_id, &payload, 0)?;
@@ -313,6 +320,11 @@ async fn send_gaia_command(vendor_id: u16, command_id: u16, payload: Vec<u8>) ->
     }
 }
 
+#[tauri::command]
+fn log_line(line: String, tone: String, _ts: String) {
+    println!("[STONE][FRONT][{}] {}", tone, line);
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
@@ -323,7 +335,8 @@ fn main() {
             list_devices,
             connect_device,
             disconnect_device,
-            send_gaia_command
+            send_gaia_command,
+            log_line
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
