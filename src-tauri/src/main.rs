@@ -26,6 +26,13 @@ struct GaiaPacketEvent {
     status: Option<u8>,
 }
 
+#[derive(Serialize, Clone)]
+struct ConnectResult {
+    address: String,
+    ok: bool,
+    error: Option<String>,
+}
+
 struct GaiaParser {
     packet: [u8; 270],
     packet_length: usize,
@@ -235,43 +242,81 @@ async fn list_devices() -> Result<Vec<BluetoothDeviceInfo>, String> {
 async fn connect_device(address: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        back_log("RUST", format!("Connect request: {}", address));
-        let status = tauri::async_runtime::spawn_blocking(move || -> Result<i32, String> {
-            let cstr = CString::new(address).map_err(|_| "Invalid address".to_string())?;
-            Ok(unsafe { macos_bt_connect(cstr.as_ptr()) })
-        })
-        .await
-        .map_err(|_| "Join error".to_string())??;
-        if status == 0 {
-            Ok(())
-        } else {
-            let context = unsafe {
-                let ptr = macos_bt_last_error_context();
-                if ptr.is_null() {
-                    "".to_string()
-                } else {
-                    CString::from_raw(ptr)
-                        .into_string()
-                        .unwrap_or_else(|_| "".to_string())
-                }
-            };
-            Err(format!(
-                "IOBluetooth error {} ({}){}",
-                status,
-                ioreturn_name(status),
-                if context.is_empty() {
-                    "".to_string()
-                } else {
-                    format!(" ({})", context)
-                }
-            ))
-        }
+        connect_device_inner(address).await
     }
 
     #[cfg(not(target_os = "macos"))]
     {
         let _ = address;
         Err("Not supported on this platform".to_string())
+    }
+}
+
+#[tauri::command]
+async fn connect_device_async(address: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let app = APP_HANDLE
+            .get()
+            .cloned()
+            .ok_or_else(|| "App not ready".to_string())?;
+        tauri::async_runtime::spawn(async move {
+            let result = connect_device_inner(address.clone()).await;
+            let payload = match result {
+                Ok(()) => ConnectResult {
+                    address,
+                    ok: true,
+                    error: None,
+                },
+                Err(err) => ConnectResult {
+                    address,
+                    ok: false,
+                    error: Some(err),
+                },
+            };
+            let _ = app.emit("bt_connect_result", payload);
+        });
+        Ok(())
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = address;
+        Err("Not supported on this platform".to_string())
+    }
+}
+
+async fn connect_device_inner(address: String) -> Result<(), String> {
+    back_log("RUST", format!("Connect request: {}", address));
+    let status = tauri::async_runtime::spawn_blocking(move || -> Result<i32, String> {
+        let cstr = CString::new(address).map_err(|_| "Invalid address".to_string())?;
+        Ok(unsafe { macos_bt_connect(cstr.as_ptr()) })
+    })
+    .await
+    .map_err(|_| "Join error".to_string())??;
+    if status == 0 {
+        Ok(())
+    } else {
+        let context = unsafe {
+            let ptr = macos_bt_last_error_context();
+            if ptr.is_null() {
+                "".to_string()
+            } else {
+                CString::from_raw(ptr)
+                    .into_string()
+                    .unwrap_or_else(|_| "".to_string())
+            }
+        };
+        Err(format!(
+            "IOBluetooth error {} ({}){}",
+            status,
+            ioreturn_name(status),
+            if context.is_empty() {
+                "".to_string()
+            } else {
+                format!(" ({})", context)
+            }
+        ))
     }
 }
 
@@ -426,6 +471,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             list_devices,
             connect_device,
+            connect_device_async,
             disconnect_device,
             send_gaia_command,
             log_line,

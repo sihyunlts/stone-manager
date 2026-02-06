@@ -143,27 +143,18 @@ static void runOnMainSync(void (^block)(void)) {
     }
 
     self.lastErrorContext = @"open_connection";
-    __block IOReturn linkStatus = kIOReturnError;
-    runOnMainSync(^{
-        linkStatus = [device openConnection];
-    });
+    IOReturn linkStatus = [device openConnection];
     BTLOG(@"Link request: status=%d", (int)linkStatus);
     BOOL linkUp = [self waitForConnection:device timeout:3.0];
     BTLOG(@"Link connected: %@", linkUp ? @"YES" : @"NO");
 
     NSMutableArray<NSNumber *> *candidates = [NSMutableArray array];
     self.lastErrorContext = @"sdp_query";
-    __block IOReturn sdpKick = kIOReturnError;
-    runOnMainSync(^{
-        sdpKick = [device performSDPQuery:nil];
-    });
+    IOReturn sdpKick = [device performSDPQuery:nil];
     BTLOG(@"SDP query kick: status=%d", (int)sdpKick);
 
     self.lastErrorContext = @"resolve_channel";
-    __block BluetoothRFCOMMChannelID resolved = 0;
-    runOnMainSync(^{
-        resolved = [self resolveRFCOMMChannel:device];
-    });
+    BluetoothRFCOMMChannelID resolved = [self resolveRFCOMMChannel:device];
 
     if (resolved != 0) {
         [candidates addObject:@(resolved)];
@@ -208,9 +199,7 @@ static void runOnMainSync(void (^block)(void)) {
     }
     if (device) {
         BTLOG(@"Link close: %@", addr);
-        runOnMainSync(^{
-            [device closeConnection];
-        });
+        [device closeConnection];
         BOOL down = [self waitForDisconnection:device timeout:2.0];
         BTLOG(@"Link disconnected: %@ (%@)", down ? @"YES" : @"NO", addr ?: @"");
     }

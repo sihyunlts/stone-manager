@@ -11,6 +11,12 @@ type GaiaPacketEvent = {
   status?: number | null;
 };
 
+type ConnectResultEvent = {
+  address: string;
+  ok: boolean;
+  error?: string | null;
+};
+
 type DeviceInfo = {
   name: string;
   address: string;
@@ -144,14 +150,9 @@ export function initApp() {
       return;
     }
     try {
-      await invoke("connect_device", { address });
-      const device = devices.find((d) => d.address === address);
-      status.textContent = device ? `Connected: ${device.name}` : `Connected: ${address}`;
-      status.classList.add("connected");
-      logLine(`Connected to ${device?.name ?? address}`, "SYS");
-      await requestBattery();
-      if (batteryTimer) clearInterval(batteryTimer);
-      batteryTimer = setInterval(requestBattery, 30_000);
+      status.textContent = "연결 중...";
+      status.classList.remove("connected");
+      await invoke("connect_device_async", { address });
     } catch (err) {
       logLine(String(err), "SYS");
     }
@@ -263,6 +264,23 @@ export function initApp() {
   el<HTMLButtonElement>("#disconnect").addEventListener("click", disconnect);
   el<HTMLButtonElement>("#send").addEventListener("click", sendCommand);
   battery.addEventListener("click", requestBattery);
+
+  listen<ConnectResultEvent>("bt_connect_result", (event: Event<ConnectResultEvent>) => {
+    const result = event.payload;
+    const device = devices.find((d) => d.address === result.address);
+    if (result.ok) {
+      status.textContent = device ? `Connected: ${device.name}` : `Connected: ${result.address}`;
+      status.classList.add("connected");
+      logLine(`Connected to ${device?.name ?? result.address}`, "SYS");
+      requestBattery().catch((err) => logLine(String(err), "SYS"));
+      if (batteryTimer) clearInterval(batteryTimer);
+      batteryTimer = setInterval(requestBattery, 30_000);
+    } else {
+      status.textContent = "연결 실패";
+      status.classList.remove("connected");
+      logLine(result.error ?? "Connect failed", "SYS");
+    }
+  });
 
   listen<GaiaPacketEvent>("gaia_packet", (event: Event<GaiaPacketEvent>) => {
     const p = event.payload;
