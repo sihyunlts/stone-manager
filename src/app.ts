@@ -30,6 +30,8 @@ type DeviceInfo = {
   raw_name?: string | null;
 };
 
+type ConnectionState = "idle" | "connecting" | "connected" | "disconnecting";
+
 function el<T extends HTMLElement>(selector: string): T {
   const node = document.querySelector(selector);
   if (!node) {
@@ -119,13 +121,61 @@ export function initApp() {
   const deviceList = el<HTMLSelectElement>("#deviceList");
   const showAll = el<HTMLInputElement>("#showAll");
   let devices: DeviceInfo[] = [];
-  let activeAddress: string | null = null;
+  let connectionState: ConnectionState = "idle";
+  let connectedAddress: string | null = null;
   let lastBatteryStep: number | null = null;
   let lastDcState: number | null = null;
   let batteryTimer: ReturnType<typeof setInterval> | null = null;
 
   function logLine(line: string, tone: "IN" | "OUT" | "SYS" = "SYS") {
     void invoke("log_line", { line, tone, ts: "" });
+  }
+
+  function getDeviceLabel(address: string) {
+    const device = devices.find((d) => d.address === address);
+    if (!device) return address;
+    return device.name || address;
+  }
+
+  function resetBatteryState() {
+    battery.textContent = "배터리: --";
+    lastBatteryStep = null;
+    lastDcState = null;
+    void invoke("set_tray_battery", { percent: null, charging: false, full: false });
+    if (batteryTimer) {
+      clearInterval(batteryTimer);
+      batteryTimer = null;
+    }
+  }
+
+  function updateConnectionStatus() {
+    switch (connectionState) {
+      case "connecting":
+        status.textContent = "연결 중...";
+        status.classList.remove("connected");
+        break;
+      case "disconnecting":
+        status.textContent = "연결 해제 중...";
+        status.classList.remove("connected");
+        break;
+      case "connected": {
+        const label = connectedAddress ? getDeviceLabel(connectedAddress) : "Unknown";
+        status.textContent = `연결됨: ${label}`;
+        status.classList.add("connected");
+        break;
+      }
+      case "idle":
+      default:
+        status.textContent = "STONE이 연결되지 않음";
+        status.classList.remove("connected");
+        break;
+    }
+  }
+
+  function setConnectionState(state: ConnectionState, address: string | null = connectedAddress) {
+    connectionState = state;
+    connectedAddress = address;
+    updateConnectionStatus();
   }
 
   function renderDeviceList() {
@@ -164,32 +214,24 @@ export function initApp() {
       return;
     }
     try {
-      status.textContent = "연결 중...";
-      status.classList.remove("connected");
-      activeAddress = address;
+      setConnectionState("connecting", address);
       await invoke("connect_device_async", { address });
     } catch (err) {
       logLine(String(err), "SYS");
+      setConnectionState("idle", null);
     }
   }
 
   async function disconnect() {
     try {
+      setConnectionState("disconnecting", connectedAddress);
       await invoke("disconnect_device");
-      status.textContent = "Disconnected";
-      status.classList.remove("connected");
-      battery.textContent = "배터리: --";
-      lastBatteryStep = null;
-      lastDcState = null;
-      activeAddress = null;
-      void invoke("set_tray_battery", { percent: null, charging: false, full: false });
-      if (batteryTimer) {
-        clearInterval(batteryTimer);
-        batteryTimer = null;
-      }
+      resetBatteryState();
+      setConnectionState("idle", null);
       logLine("Disconnected", "SYS");
     } catch (err) {
       logLine(String(err), "SYS");
+      setConnectionState("idle", connectedAddress);
     }
   }
 
@@ -285,19 +327,18 @@ export function initApp() {
     const result = event.payload;
     const device = devices.find((d) => d.address === result.address);
     if (result.ok) {
-      activeAddress = result.address;
-      status.textContent = device ? `Connected: ${device.name}` : `Connected: ${result.address}`;
-      status.classList.add("connected");
+      setConnectionState("connected", result.address);
       logLine(`Connected to ${device?.name ?? result.address}`, "SYS");
       requestBattery().catch((err) => logLine(String(err), "SYS"));
       if (batteryTimer) clearInterval(batteryTimer);
       batteryTimer = setInterval(requestBattery, 30_000);
     } else {
-      if (activeAddress === result.address) {
-        activeAddress = null;
+      if (connectedAddress === result.address) {
+        resetBatteryState();
+        setConnectionState("idle", null);
+      } else {
+        setConnectionState("idle", connectedAddress);
       }
-      status.textContent = "연결 실패";
-      status.classList.remove("connected");
       logLine(result.error ?? "Connect failed", "SYS");
     }
   });
@@ -311,18 +352,9 @@ export function initApp() {
     } else {
       refreshDevices().catch((err) => logLine(String(err), "SYS"));
     }
-    if (activeAddress === address && !connected) {
-      status.textContent = "연결 끊김";
-      status.classList.remove("connected");
-      battery.textContent = "배터리: --";
-      lastBatteryStep = null;
-      lastDcState = null;
-      activeAddress = null;
-      void invoke("set_tray_battery", { percent: null, charging: false, full: false });
-      if (batteryTimer) {
-        clearInterval(batteryTimer);
-        batteryTimer = null;
-      }
+    if (connectedAddress === address && !connected) {
+      resetBatteryState();
+      setConnectionState("idle", null);
     }
   });
 
