@@ -52,7 +52,10 @@ export function initApp() {
 
       <main class="layout">
         <header class="card">
-          <div class="status" id="status">STONE이 연결되지 않음</div>
+          <div class="status-row">
+            <div class="status" id="status">STONE이 연결되지 않음</div>
+            <div class="battery" id="battery">배터리: --</div>
+          </div>
         </header>
 
         <section>
@@ -105,10 +108,14 @@ export function initApp() {
   `;
 
   const status = el<HTMLDivElement>("#status");
+  const battery = el<HTMLDivElement>("#battery");
   const deviceList = el<HTMLSelectElement>("#deviceList");
   const log = el<HTMLDivElement>("#log");
   const showAll = el<HTMLInputElement>("#showAll");
   let devices: DeviceInfo[] = [];
+  let lastBatteryStep: number | null = null;
+  let lastDcState: number | null = null;
+  let batteryTimer: ReturnType<typeof setInterval> | null = null;
 
   function logLine(line: string, tone: "in" | "out" | "sys" = "sys") {
     const div = document.createElement("div");
@@ -152,6 +159,9 @@ export function initApp() {
       status.textContent = device ? `Connected: ${device.name}` : `Connected: ${address}`;
       status.classList.add("connected");
       logLine(`Connected to ${device?.name ?? address}`, "sys");
+      await requestBattery();
+      if (batteryTimer) clearInterval(batteryTimer);
+      batteryTimer = setInterval(requestBattery, 30_000);
     } catch (err) {
       logLine(String(err), "sys");
     }
@@ -162,10 +172,63 @@ export function initApp() {
       await invoke("disconnect_device");
       status.textContent = "Disconnected";
       status.classList.remove("connected");
+      battery.textContent = "배터리: --";
+      lastBatteryStep = null;
+      lastDcState = null;
+      if (batteryTimer) {
+        clearInterval(batteryTimer);
+        batteryTimer = null;
+      }
       logLine("Disconnected", "sys");
     } catch (err) {
       logLine(String(err), "sys");
     }
+  }
+
+  async function requestBattery() {
+    try {
+      await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0455, payload: [] });
+      await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0456, payload: [] });
+      logLine("→ Battery request (5054 0455)", "out");
+    } catch (err) {
+      logLine(String(err), "sys");
+    }
+  }
+
+  function updateBatteryLabel() {
+    if (lastBatteryStep === null) {
+      battery.textContent = "배터리: --";
+      return;
+    }
+    let percent: number;
+    switch (lastBatteryStep) {
+      case 0:
+      case 1:
+        percent = 20;
+        break;
+      case 2:
+        percent = 40;
+        break;
+      case 3:
+        percent = 60;
+        break;
+      case 4:
+        percent = 80;
+        break;
+      case 5:
+        percent = 100;
+        break;
+      default:
+        percent = lastBatteryStep;
+        break;
+    }
+    let suffix = "";
+    if (lastDcState === 1 && lastBatteryStep === 5) {
+      suffix = " (완충)";
+    } else if (lastDcState === 3) {
+      suffix = " (충전 중)";
+    }
+    battery.textContent = `배터리: ${percent}%${suffix}`;
   }
 
   async function sendCommand() {
@@ -204,9 +267,22 @@ export function initApp() {
   el<HTMLButtonElement>("#connect").addEventListener("click", connect);
   el<HTMLButtonElement>("#disconnect").addEventListener("click", disconnect);
   el<HTMLButtonElement>("#send").addEventListener("click", sendCommand);
+  battery.addEventListener("click", requestBattery);
 
   listen<GaiaPacketEvent>("gaia_packet", (event: Event<GaiaPacketEvent>) => {
     const p = event.payload;
+    if (p.vendor_id === 0x5054 && p.command === 0x0455 && p.ack) {
+      if (p.payload.length >= 2) {
+        lastBatteryStep = p.payload[0];
+        updateBatteryLabel();
+      }
+    }
+    if (p.vendor_id === 0x5054 && p.command === 0x0456 && p.ack) {
+      if (p.payload.length >= 1) {
+        lastDcState = p.payload.length >= 2 ? p.payload[1] : p.payload[0];
+        updateBatteryLabel();
+      }
+    }
     const payloadText = p.payload.length
       ? p.payload.map((b: number) => toHex(b, 2)).join(" ")
       : "<empty>";

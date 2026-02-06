@@ -77,6 +77,21 @@ body {
   color: var(--muted);
 }
 
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.battery {
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-weight: 600;
+  color: var(--muted);
+}
+
 .status.connected {
   color: #3ae796;
 }
