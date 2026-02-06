@@ -52,9 +52,6 @@ export function initApp() {
 
       <main class="layout">
         <header class="card">
-          <div>
-            <h1>STONE 매니저</h1>
-          </div>
           <div class="status" id="status">STONE이 연결되지 않음</div>
         </header>
 
