@@ -4,7 +4,9 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::ffi::CString;
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager, Wry};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::tray::{TrayIcon, TrayIconBuilder};
 
 #[derive(Serialize, Deserialize, Clone)]
 struct BluetoothDeviceInfo {
@@ -172,6 +174,9 @@ fn back_log(source: &str, message: String) {
 
 static APP_HANDLE: OnceCell<AppHandle> = OnceCell::new();
 static PARSER: OnceCell<Mutex<GaiaParser>> = OnceCell::new();
+static TRAY: OnceCell<TrayIcon<Wry>> = OnceCell::new();
+static TRAY_MENU: OnceCell<Menu<Wry>> = OnceCell::new();
+static TRAY_BATTERY_ITEM: OnceCell<MenuItem<Wry>> = OnceCell::new();
 
 fn get_parser() -> &'static Mutex<GaiaParser> {
     PARSER.get_or_init(|| Mutex::new(GaiaParser::new()))
@@ -325,10 +330,87 @@ fn log_line(line: String, tone: String, _ts: String) {
     println!("[STONE][FRONT][{}] {}", tone, line);
 }
 
+#[tauri::command]
+fn set_tray_battery(percent: Option<u8>, charging: bool, full: bool) {
+    let Some(tray) = TRAY.get() else { return; };
+    let title = percent.map(|p| format!("{p}%")).unwrap_or_default();
+    let _ = tray.set_title(Some(title));
+    if let Some(item) = TRAY_BATTERY_ITEM.get() {
+        let label = match percent {
+            Some(p) => {
+                if full {
+                    format!("배터리: {p}% (충전 완료)")
+                } else if charging {
+                    format!("배터리: {p}% (충전 중)")
+                } else {
+                    format!("배터리: {p}%")
+                }
+            }
+            None => "배터리: --".to_string(),
+        };
+        let _ = item.set_text(label);
+    }
+    let tooltip = match percent {
+        Some(p) => {
+            if full {
+                format!("배터리: {p}% (충전 완료)")
+            } else if charging {
+                format!("배터리: {p}% (충전 중)")
+            } else {
+                format!("배터리: {p}%")
+            }
+        }
+        None => "배터리: --".to_string(),
+    };
+    let _ = tray.set_tooltip(Some(tooltip));
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
             let _ = APP_HANDLE.set(app.handle().clone());
+            if let Some(icon) = app.default_window_icon().cloned() {
+                let battery_item = MenuItem::with_id(app, "battery", "배터리: --", false, None::<&str>)
+                .ok();
+                let separator = PredefinedMenuItem::separator(app).ok();
+                let show_item = MenuItem::with_id(app, "show", "STONE 매니저 열기", true, None::<&str>)
+                .ok();
+                let quit_item = MenuItem::with_id(app, "quit", "종료", true, None::<&str>)
+                .ok();
+                let menu = if let (Some(battery), Some(sep), Some(show), Some(quit)) = (battery_item, separator, show_item, quit_item) {
+                    let menu = Menu::with_items(app, &[&battery, &sep, &show, &quit]).ok();
+                    let _ = TRAY_BATTERY_ITEM.set(battery);
+                    menu
+                } else {
+                    None
+                };
+                if let Some(menu) = menu {
+                    let _ = TRAY_MENU.set(menu.clone());
+                    if let Ok(tray) = TrayIconBuilder::new()
+                        .icon(icon)
+                        .tooltip("STONE 매니저")
+                        .menu(&menu)
+                        .show_menu_on_left_click(true)
+                        .on_menu_event(|app, event| {
+                            match event.id().as_ref() {
+                                "show" => {
+                                    if let Some(win) = app.get_webview_window("main") {
+                                        let _ = win.show();
+                                        let _ = win.set_focus();
+                                    }
+                                }
+                                "quit" => {
+                                    app.exit(0);
+                                }
+                                _ => {}
+                            }
+                        })
+                        .build(app)
+                    {
+                        let _ = TRAY.set(tray);
+                    }
+                }
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -336,7 +418,8 @@ fn main() {
             connect_device,
             disconnect_device,
             send_gaia_command,
-            log_line
+            log_line,
+            set_tray_battery
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

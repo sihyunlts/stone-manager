@@ -165,6 +165,7 @@ export function initApp() {
       battery.textContent = "배터리: --";
       lastBatteryStep = null;
       lastDcState = null;
+      void invoke("set_tray_battery", { percent: null, charging: false, full: false });
       if (batteryTimer) {
         clearInterval(batteryTimer);
         batteryTimer = null;
@@ -188,6 +189,7 @@ export function initApp() {
   function updateBatteryLabel() {
     if (lastBatteryStep === null) {
       battery.textContent = "배터리: --";
+      void invoke("set_tray_battery", { percent: null, charging: false, full: false });
       return;
     }
     let percent: number;
@@ -213,12 +215,15 @@ export function initApp() {
         break;
     }
     let suffix = "";
-    if (lastDcState === 1 && lastBatteryStep === 5) {
+    const isFull = lastDcState === 1 && lastBatteryStep === 5;
+    const isCharging = lastDcState === 3;
+    if (isFull) {
       suffix = " (충전 완료)";
-    } else if (lastDcState === 3) {
+    } else if (isCharging) {
       suffix = " (충전 중)";
     }
     battery.textContent = `배터리: ${percent}%${suffix}`;
+    void invoke("set_tray_battery", { percent, charging: isCharging, full: isFull });
   }
 
   async function sendCommand() {
