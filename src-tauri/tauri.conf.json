@@ -17,6 +17,8 @@
         "hiddenTitle": true,
         "width": 1100,
         "height": 720,
+        "minWidth": 320,
+        "minHeight": 720,
         "resizable": true
       }
     ],
