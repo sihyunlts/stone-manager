@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type Event } from "@tauri-apps/api/event";
+import { bindDevPage, renderDevPage } from "./dev";
 
 type GaiaPacketEvent = {
   vendor_id: number;
@@ -74,10 +75,12 @@ export function initApp() {
   app.innerHTML = `
     <div class="app-shell">
       <div class="app-header" data-tauri-drag-region>
-        <div class="app-title">STONE 매니저</div>
+        <button class="nav-back" id="navBack" data-tauri-drag-region="false">뒤로</button>
+        <div class="app-title" id="appTitle" data-tauri-drag-region="false">STONE 매니저</div>
+        <div class="header-spacer"></div>
       </div>
 
-      <main class="layout">
+      <main class="layout" id="mainPage">
         <header class="card">
           <div class="status-row">
             <div class="status" id="status">STONE이 연결되지 않음</div>
@@ -108,33 +111,13 @@ export function initApp() {
           </div>
         </section>
 
-        <section>
-          <h2>GAIA 커맨드 전송</h2>
-          <div class="card">
-            <div class="grid">
-              <label>
-                벤더 ID (hex)
-                <input id="vendorId" value="5054" />
-              </label>
-              <label>
-                커맨드 ID (hex)
-                <input id="commandId" value="0201" />
-              </label>
-              <label class="wide">
-                페이로드 (hex)
-                <input id="payload" placeholder="e.g. 1E or 0A0B0C" />
-              </label>
-            </div>
-            <div class="row">
-              <button id="send">전송</button>
-            </div>
-          </div>
-        </section>
-
       </main>
+      ${renderDevPage()}
     </div>
   `;
 
+  const appTitle = el<HTMLDivElement>("#appTitle");
+  const navBack = el<HTMLButtonElement>("#navBack");
   const status = el<HTMLDivElement>("#status");
   const battery = el<HTMLDivElement>("#battery");
   const registerList = el<HTMLSelectElement>("#registerList");
@@ -149,9 +132,35 @@ export function initApp() {
   let lastBatteryStep: number | null = null;
   let lastDcState: number | null = null;
   let batteryTimer: ReturnType<typeof setInterval> | null = null;
+  let devEnabled = false;
+  let devClicks = 0;
+  let devClickTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function setPage(page: "home" | "dev") {
+    document.body.dataset.page = page;
+    appTitle.textContent = page === "dev" ? "개발자 메뉴" : "STONE 매니저";
+  }
+
+  setPage("home");
 
   function logLine(line: string, tone: "IN" | "OUT" | "SYS" = "SYS") {
     void invoke("log_line", { line, tone, ts: "" });
+  }
+
+  function onDevClick() {
+    devClicks += 1;
+    if (devClickTimer) {
+      clearTimeout(devClickTimer);
+    }
+    devClickTimer = setTimeout(() => {
+      devClicks = 0;
+    }, 1500);
+    if (devClicks >= 7) {
+      devClicks = 0;
+      devEnabled = true;
+      logLine("Developer menu unlocked", "SYS");
+      setPage("dev");
+    }
   }
 
   function getDeviceLabel(address: string) {
@@ -461,10 +470,7 @@ export function initApp() {
     void invoke("set_tray_battery", { percent, charging: isCharging, full: isFull });
   }
 
-  async function sendCommand() {
-    const vendorIdHex = el<HTMLInputElement>("#vendorId").value.trim();
-    const commandIdHex = el<HTMLInputElement>("#commandId").value.trim();
-    const payloadHex = el<HTMLInputElement>("#payload").value.trim();
+  async function sendCommand(vendorIdHex: string, commandIdHex: string, payloadHex: string) {
 
     const vendorId = parseInt(vendorIdHex, 16);
     const commandId = parseInt(commandIdHex, 16);
@@ -495,9 +501,13 @@ export function initApp() {
   el<HTMLButtonElement>("#refreshDevices").addEventListener("click", refreshDevices);
   el<HTMLButtonElement>("#connect").addEventListener("click", connect);
   el<HTMLButtonElement>("#disconnect").addEventListener("click", disconnect);
-  el<HTMLButtonElement>("#send").addEventListener("click", sendCommand);
+  bindDevPage({ onSend: sendCommand });
   battery.addEventListener("click", requestBattery);
   registerButton.addEventListener("click", registerDevice);
+  appTitle.addEventListener("click", onDevClick);
+  navBack.addEventListener("click", () => {
+    setPage("home");
+  });
   removeButton.addEventListener("click", () => {
     const address = registeredList.value;
     if (!address) {
