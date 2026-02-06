@@ -214,7 +214,7 @@ export function initApp() {
     }
     let suffix = "";
     if (lastDcState === 1 && lastBatteryStep === 5) {
-      suffix = " (완충)";
+      suffix = " (충전 완료)";
     } else if (lastDcState === 3) {
       suffix = " (충전 중)";
     }
@@ -261,15 +261,16 @@ export function initApp() {
 
   listen<GaiaPacketEvent>("gaia_packet", (event: Event<GaiaPacketEvent>) => {
     const p = event.payload;
+    const dataPayload = p.ack && p.payload.length > 0 ? p.payload.slice(1) : p.payload;
     if (p.vendor_id === 0x5054 && p.command === 0x0455 && p.ack) {
-      if (p.payload.length >= 2) {
-        lastBatteryStep = p.payload[0];
+      if (dataPayload.length >= 1) {
+        lastBatteryStep = dataPayload[0];
         updateBatteryLabel();
       }
     }
     if (p.vendor_id === 0x5054 && p.command === 0x0456 && p.ack) {
-      if (p.payload.length >= 1) {
-        lastDcState = p.payload.length >= 2 ? p.payload[1] : p.payload[0];
+      if (dataPayload.length >= 1) {
+        lastDcState = dataPayload[0];
         updateBatteryLabel();
       }
     }
