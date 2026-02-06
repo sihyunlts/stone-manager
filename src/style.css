@@ -165,6 +165,22 @@ h2 {
   align-items: center;
 }
 
+.volume-row {
+  width: 100%;
+  align-items: center;
+}
+
+#volumeSlider {
+  flex: 1;
+}
+
+.volume-value {
+  min-width: 36px;
+  text-align: right;
+  font-weight: 600;
+  color: var(--muted);
+}
+
 .toggle {
   display: inline-flex;
   align-items: center;

@@ -89,6 +89,16 @@ export function initApp() {
         </header>
 
         <section>
+          <h2>소리</h2>
+          <div class="card">
+            <div class="row volume-row">
+              <input id="volumeSlider" type="range" min="0" max="30" step="1" value="0" />
+              <div class="volume-value" id="volumeValue">--</div>
+            </div>
+          </div>
+        </section>
+
+        <section>
           <h2>기기 등록</h2>
           <div class="card">
             <div class="row">
@@ -120,6 +130,8 @@ export function initApp() {
   const navBack = el<HTMLButtonElement>("#navBack");
   const status = el<HTMLDivElement>("#status");
   const battery = el<HTMLDivElement>("#battery");
+  const volumeSlider = el<HTMLInputElement>("#volumeSlider");
+  const volumeValue = el<HTMLDivElement>("#volumeValue");
   const registerList = el<HTMLSelectElement>("#registerList");
   const registeredList = el<HTMLSelectElement>("#registeredList");
   const registerButton = el<HTMLButtonElement>("#registerDevice");
@@ -132,6 +144,8 @@ export function initApp() {
   let lastBatteryStep: number | null = null;
   let lastDcState: number | null = null;
   let batteryTimer: ReturnType<typeof setInterval> | null = null;
+  let volumeValueState: number | null = null;
+  let volumeDebounce: ReturnType<typeof setTimeout> | null = null;
   let devEnabled = false;
   let devClicks = 0;
   let devClickTimer: ReturnType<typeof setTimeout> | null = null;
@@ -218,16 +232,53 @@ export function initApp() {
     void invoke("set_tray_battery", { percent: null, charging: false, full: false });
   }
 
+  function setVolumeEnabled(enabled: boolean) {
+    volumeSlider.disabled = !enabled;
+  }
+
+  function updateVolumeUI(value: number | null) {
+    if (value === null || Number.isNaN(value)) {
+      volumeValueState = null;
+      volumeValue.textContent = "--";
+      volumeSlider.value = "0";
+      return;
+    }
+    volumeValueState = value;
+    volumeSlider.value = String(value);
+    volumeValue.textContent = String(value);
+  }
+
+  async function requestVolume() {
+    try {
+      await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0401, payload: [] });
+      logLine("Volume request (5054 0401)", "OUT");
+    } catch (err) {
+      logLine(String(err), "SYS");
+    }
+  }
+
+  async function setVolume(value: number) {
+    try {
+      await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0201, payload: [value] });
+    } catch (err) {
+      logLine(String(err), "SYS");
+    }
+  }
+
   function setConnected(address: string) {
     setConnectionState("connected", address);
     requestBattery().catch((err) => logLine(String(err), "SYS"));
+    requestVolume().catch((err) => logLine(String(err), "SYS"));
     stopBatteryPolling();
     batteryTimer = setInterval(requestBattery, 30_000);
+    setVolumeEnabled(true);
   }
 
   function setDisconnected() {
     stopBatteryPolling();
     resetBatteryState();
+    updateVolumeUI(null);
+    setVolumeEnabled(false);
     setConnectionState("idle", null);
   }
 
@@ -503,6 +554,19 @@ export function initApp() {
   el<HTMLButtonElement>("#disconnect").addEventListener("click", disconnect);
   bindDevPage({ onSend: sendCommand });
   battery.addEventListener("click", requestBattery);
+  setVolumeEnabled(false);
+  updateVolumeUI(null);
+  volumeSlider.addEventListener("input", () => {
+    if (volumeSlider.disabled) return;
+    const value = Number(volumeSlider.value);
+    updateVolumeUI(value);
+    if (volumeDebounce) {
+      clearTimeout(volumeDebounce);
+    }
+    volumeDebounce = setTimeout(() => {
+      setVolume(value);
+    }, 150);
+  });
   registerButton.addEventListener("click", registerDevice);
   appTitle.addEventListener("click", onDevClick);
   navBack.addEventListener("click", () => {
@@ -574,6 +638,11 @@ export function initApp() {
       if (dataPayload.length >= 1) {
         lastDcState = dataPayload[0];
         updateBatteryLabel();
+      }
+    }
+    if (p.vendor_id === 0x5054 && p.command === 0x0401 && p.ack) {
+      if (dataPayload.length >= 1) {
+        updateVolumeUI(dataPayload[0]);
       }
     }
     const payloadText = p.payload.length
