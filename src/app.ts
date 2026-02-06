@@ -45,60 +45,66 @@ function parseHexBytes(input: string): number[] {
 export function initApp() {
   const app = el<HTMLDivElement>("#app");
   app.innerHTML = `
-    <main class="layout">
-      <header class="card">
-        <div>
-          <h1>STONE 매니저</h1>
-        </div>
-        <div class="status" id="status">STONE이 연결되지 않음</div>
-      </header>
+    <div class="app-shell">
+      <div class="app-header" data-tauri-drag-region>
+        <div class="app-title">STONE 매니저</div>
+      </div>
 
-      <section>
-        <h2>연결</h2>
-        <div class="card">
-          <div class="row">
-            <button id="refreshDevices">새로고침</button>
-            <select id="deviceList"></select>
-            <label class="toggle">
-              <input id="showAll" type="checkbox" checked />
-              <span>모든 기기 보기</span>
-            </label>
-            <button id="connect">연결</button>
-            <button id="disconnect">연결 끊기</button>
+      <main class="layout">
+        <header class="card">
+          <div>
+            <h1>STONE 매니저</h1>
           </div>
-        </div>
-      </section>
+          <div class="status" id="status">STONE이 연결되지 않음</div>
+        </header>
 
-      <section>
-        <h2>GAIA 커맨드 전송</h2>
-        <div class="card">
-          <div class="grid">
-            <label>
-              벤더 ID (hex)
-              <input id="vendorId" value="5054" />
-            </label>
-            <label>
-              커맨드 ID (hex)
-              <input id="commandId" value="0201" />
-            </label>
-            <label class="wide">
-              페이로드 (hex)
-              <input id="payload" placeholder="e.g. 1E or 0A0B0C" />
-            </label>
+        <section>
+          <h2>연결</h2>
+          <div class="card">
+            <div class="row">
+              <button id="refreshDevices">새로고침</button>
+              <select id="deviceList"></select>
+              <label class="toggle">
+                <input id="showAll" type="checkbox" checked />
+                <span>모든 기기 보기</span>
+              </label>
+              <button id="connect">연결</button>
+              <button id="disconnect">연결 끊기</button>
+            </div>
           </div>
-          <div class="row">
-            <button id="send">전송</button>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section>
-        <h2>로그</h2>
-        <div class="card log">
-          <div id="log"></div>
-        </div>
-      </section>
-    </main>
+        <section>
+          <h2>GAIA 커맨드 전송</h2>
+          <div class="card">
+            <div class="grid">
+              <label>
+                벤더 ID (hex)
+                <input id="vendorId" value="5054" />
+              </label>
+              <label>
+                커맨드 ID (hex)
+                <input id="commandId" value="0201" />
+              </label>
+              <label class="wide">
+                페이로드 (hex)
+                <input id="payload" placeholder="e.g. 1E or 0A0B0C" />
+              </label>
+            </div>
+            <div class="row">
+              <button id="send">전송</button>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>로그</h2>
+          <div class="card log">
+            <div id="log"></div>
+          </div>
+        </section>
+      </main>
+    </div>
   `;
 
   const status = el<HTMLDivElement>("#status");
