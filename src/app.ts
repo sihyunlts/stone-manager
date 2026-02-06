@@ -17,10 +17,17 @@ type ConnectResultEvent = {
   error?: string | null;
 };
 
+type DeviceStateEvent = {
+  address: string;
+  connected: boolean;
+};
+
 type DeviceInfo = {
   name: string;
   address: string;
   connected: boolean;
+  alias?: string | null;
+  raw_name?: string | null;
 };
 
 function el<T extends HTMLElement>(selector: string): T {
@@ -112,6 +119,7 @@ export function initApp() {
   const deviceList = el<HTMLSelectElement>("#deviceList");
   const showAll = el<HTMLInputElement>("#showAll");
   let devices: DeviceInfo[] = [];
+  let activeAddress: string | null = null;
   let lastBatteryStep: number | null = null;
   let lastDcState: number | null = null;
   let batteryTimer: ReturnType<typeof setInterval> | null = null;
@@ -127,7 +135,13 @@ export function initApp() {
       const opt = document.createElement("option");
       opt.value = device.address;
       const status = device.connected ? "connected" : "paired";
-      opt.textContent = `${device.name} (${device.address}) · ${status}`;
+      const alias = device.alias ?? "";
+      const raw = device.raw_name ?? "";
+      const label =
+        alias && raw && alias !== raw
+          ? `${alias} (name: ${raw})`
+          : device.name;
+      opt.textContent = `${label} (${device.address}) · ${status}`;
       deviceList.appendChild(opt);
     }
 
@@ -152,6 +166,7 @@ export function initApp() {
     try {
       status.textContent = "연결 중...";
       status.classList.remove("connected");
+      activeAddress = address;
       await invoke("connect_device_async", { address });
     } catch (err) {
       logLine(String(err), "SYS");
@@ -166,6 +181,7 @@ export function initApp() {
       battery.textContent = "배터리: --";
       lastBatteryStep = null;
       lastDcState = null;
+      activeAddress = null;
       void invoke("set_tray_battery", { percent: null, charging: false, full: false });
       if (batteryTimer) {
         clearInterval(batteryTimer);
@@ -269,6 +285,7 @@ export function initApp() {
     const result = event.payload;
     const device = devices.find((d) => d.address === result.address);
     if (result.ok) {
+      activeAddress = result.address;
       status.textContent = device ? `Connected: ${device.name}` : `Connected: ${result.address}`;
       status.classList.add("connected");
       logLine(`Connected to ${device?.name ?? result.address}`, "SYS");
@@ -276,9 +293,36 @@ export function initApp() {
       if (batteryTimer) clearInterval(batteryTimer);
       batteryTimer = setInterval(requestBattery, 30_000);
     } else {
+      if (activeAddress === result.address) {
+        activeAddress = null;
+      }
       status.textContent = "연결 실패";
       status.classList.remove("connected");
       logLine(result.error ?? "Connect failed", "SYS");
+    }
+  });
+
+  listen<DeviceStateEvent>("bt_device_event", (event: Event<DeviceStateEvent>) => {
+    const { address, connected } = event.payload;
+    const target = devices.find((d) => d.address === address);
+    if (target) {
+      target.connected = connected;
+      renderDeviceList();
+    } else {
+      refreshDevices().catch((err) => logLine(String(err), "SYS"));
+    }
+    if (activeAddress === address && !connected) {
+      status.textContent = "연결 끊김";
+      status.classList.remove("connected");
+      battery.textContent = "배터리: --";
+      lastBatteryStep = null;
+      lastDcState = null;
+      activeAddress = null;
+      void invoke("set_tray_battery", { percent: null, charging: false, full: false });
+      if (batteryTimer) {
+        clearInterval(batteryTimer);
+        batteryTimer = null;
+      }
     }
   });
 

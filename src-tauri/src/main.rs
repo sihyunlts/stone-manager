@@ -2,7 +2,7 @@
 
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, Wry, WindowEvent};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
@@ -24,6 +24,12 @@ struct GaiaPacketEvent {
     flags: u8,
     payload: Vec<u8>,
     status: Option<u8>,
+}
+
+#[derive(Serialize, Clone)]
+struct DeviceStateEvent {
+    address: String,
+    connected: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -213,6 +219,23 @@ pub extern "C" fn macos_bt_on_data(data: *const u8, len: usize) {
         for packet in packets {
             let _ = app.emit("gaia_packet", packet);
         }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn macos_bt_on_device_event(address: *const std::os::raw::c_char, connected: i32) {
+    if address.is_null() {
+        return;
+    }
+    let addr = unsafe { CStr::from_ptr(address) }.to_string_lossy().to_string();
+    if let Some(app) = APP_HANDLE.get() {
+        let _ = app.emit(
+            "bt_device_event",
+            DeviceStateEvent {
+                address: addr,
+                connected: connected != 0,
+            },
+        );
     }
 }
 

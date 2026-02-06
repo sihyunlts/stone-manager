@@ -10,11 +10,14 @@
 } while(0)
 
 extern void macos_bt_on_data(const uint8_t *data, size_t len);
+extern void macos_bt_on_device_event(const char *address, int connected);
 
 @interface StoneBluetoothManager : NSObject <IOBluetoothDeviceAsyncCallbacks, IOBluetoothRFCOMMChannelDelegate>
 @property (nonatomic, strong) IOBluetoothDevice *device;
 @property (nonatomic, strong) IOBluetoothRFCOMMChannel *channel;
 @property (nonatomic, copy) NSString *lastErrorContext;
+@property (nonatomic, strong) IOBluetoothUserNotification *connectNotification;
+@property (nonatomic, strong) NSMutableDictionary<NSString *, IOBluetoothUserNotification *> *disconnectNotifications;
 @end
 
 @implementation StoneBluetoothManager
@@ -34,6 +37,62 @@ static void runOnMainSync(void (^block)(void)) {
         instance = [[StoneBluetoothManager alloc] init];
     });
     return instance;
+}
+
+- (void)ensureConnectionNotifications {
+    if (!self.connectNotification) {
+        self.connectNotification = [IOBluetoothDevice registerForConnectNotifications:self selector:@selector(deviceConnected:device:)];
+    }
+    if (!self.disconnectNotifications) {
+        self.disconnectNotifications = [NSMutableDictionary dictionary];
+    }
+    for (IOBluetoothDevice *device in [IOBluetoothDevice pairedDevices]) {
+        if ([device isConnected]) {
+            [self registerDisconnectNotification:device];
+        }
+    }
+}
+
+- (void)registerDisconnectNotification:(IOBluetoothDevice *)device {
+    NSString *addr = device.addressString ?: @"";
+    if (addr.length == 0) {
+        return;
+    }
+    if (self.disconnectNotifications[addr]) {
+        return;
+    }
+    IOBluetoothUserNotification *note = [device registerForDisconnectNotification:self selector:@selector(deviceDisconnected:device:)];
+    if (note) {
+        self.disconnectNotifications[addr] = note;
+    }
+}
+
+- (void)deviceConnected:(IOBluetoothUserNotification *)note device:(IOBluetoothDevice *)device {
+    (void)note;
+    if (!device) {
+        return;
+    }
+    NSString *addr = device.addressString ?: @"";
+    if (addr.length > 0) {
+        [self registerDisconnectNotification:device];
+        macos_bt_on_device_event([addr UTF8String], 1);
+    }
+}
+
+- (void)deviceDisconnected:(IOBluetoothUserNotification *)note device:(IOBluetoothDevice *)device {
+    (void)note;
+    if (!device) {
+        return;
+    }
+    NSString *addr = device.addressString ?: @"";
+    if (addr.length > 0) {
+        IOBluetoothUserNotification *existing = self.disconnectNotifications[addr];
+        if (existing) {
+            [existing unregister];
+            [self.disconnectNotifications removeObjectForKey:addr];
+        }
+        macos_bt_on_device_event([addr UTF8String], 0);
+    }
 }
 
 - (void)connectionComplete:(IOBluetoothDevice *)device status:(IOReturn)status {}
@@ -108,6 +167,7 @@ static void runOnMainSync(void (^block)(void)) {
 }
 
 - (IOReturn)connectToAddress:(NSString *)address {
+    [self ensureConnectionNotifications];
     [self disconnect];
 
     IOBluetoothDevice *device = [IOBluetoothDevice deviceWithAddressString:address];
@@ -250,6 +310,7 @@ static void runOnMainSync(void (^block)(void)) {
 char *macos_bt_list_paired_devices(void) {
     __block char *result = NULL;
     void (^work)(void) = ^{
+        [[StoneBluetoothManager shared] ensureConnectionNotifications];
         NSMutableArray *entries = [NSMutableArray array];
         for (IOBluetoothDevice *device in [IOBluetoothDevice pairedDevices]) {
             NSString *name = device.name ?: @"(unknown)";
