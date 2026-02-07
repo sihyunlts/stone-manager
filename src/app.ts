@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type Event } from "@tauri-apps/api/event";
 import { bindDevPage, renderDevPage } from "./dev";
+import { renderSettingsPage } from "./settings";
 import { animate } from "motion";
 
 type GaiaPacketEvent = {
@@ -80,7 +81,7 @@ export function initApp() {
           <div class="app-header" data-tauri-drag-region>
             <button class="nav-back" data-tauri-drag-region="false">뒤로</button>
             <div class="app-title" id="appTitle" data-tauri-drag-region="false">STONE 매니저</div>
-            <div class="header-spacer"></div>
+            <button class="nav-info" id="navSettings" data-tauri-drag-region="false">설정</button>
           </div>
           <main class="layout">
             <header class="card">
@@ -154,6 +155,7 @@ export function initApp() {
             </section>
           </main>
         </div>
+        ${renderSettingsPage()}
         ${renderDevPage()}
       </div>
     </div>
@@ -161,9 +163,11 @@ export function initApp() {
 
   const appTitle = el<HTMLDivElement>("#appTitle");
   const navBackButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-back"));
+  const navSettings = el<HTMLButtonElement>("#navSettings");
   const pageHost = el<HTMLDivElement>("#pageHost");
   const pageHome = el<HTMLDivElement>("#page-home");
   const pageDev = el<HTMLDivElement>("#page-dev");
+  const pageSettings = el<HTMLDivElement>("#page-settings");
   const status = el<HTMLDivElement>("#status");
   const battery = el<HTMLDivElement>("#battery");
   const volumeSlider = el<HTMLInputElement>("#volumeSlider");
@@ -197,52 +201,57 @@ export function initApp() {
   let devClicks = 0;
   let devClickTimer: ReturnType<typeof setTimeout> | null = null;
 
-  let currentPage: "home" | "dev" = "home";
+  let currentPage: "home" | "dev" | "settings" = "home";
   let isTransitioning = false;
 
   pageHome.style.transform = "translateX(0)";
   pageHome.style.filter = "brightness(1)";
   pageDev.style.transform = "translateX(100%)";
+  pageSettings.style.transform = "translateX(100%)";
   pageDev.style.zIndex = "0";
   pageHome.style.zIndex = "1";
-  async function navigate(to: "home" | "dev") {
+  async function navigate(to: "home" | "dev" | "settings") {
     if (isTransitioning || to === currentPage) return;
     isTransitioning = true;
     pageHost.style.pointerEvents = "none";
-    if (to === "dev") {
-      pageDev.style.transform = "translateX(100%)";
-      pageDev.style.zIndex = "2";
-      pageHome.style.zIndex = "1";
-      
-      const springConfig = { 
-        type: "spring" as const, 
-        stiffness: 300, 
+    const bring = to === "dev" ? pageDev : to === "settings" ? pageSettings : pageHome;
+    const leave = currentPage === "dev" ? pageDev : currentPage === "settings" ? pageSettings : pageHome;
+    if (to === "home") {
+      pageHome.style.transform = "translateX(-100%)";
+    } else {
+      bring.style.transform = "translateX(100%)";
+    }
+    bring.style.zIndex = "2";
+    leave.style.zIndex = "1";
+    if (to !== "home") {
+      const springConfig = {
+        type: "spring" as const,
+        stiffness: 300,
         damping: 30,
-        mass: 1
+        mass: 1,
       };
 
       await Promise.all([
-        animate(pageDev, { transform: "translateX(0%)" }, springConfig).finished,
+        animate(bring, { transform: "translateX(0%)" }, springConfig).finished,
         animate(pageHome, { transform: "translateX(-20%)" }, springConfig).finished,
       ]);
-      currentPage = "dev";
-      requestAllDeviceInfo();
+      currentPage = to;
+      if (to === "dev" || to === "settings") {
+        requestAllDeviceInfo();
+      }
     } else {
-      pageDev.style.zIndex = "2";
-      pageHome.style.zIndex = "1";
-
-      const springConfig = { 
-        type: "spring" as const, 
-        stiffness: 400, 
-        damping: 40 
+      const springConfig = {
+        type: "spring" as const,
+        stiffness: 400,
+        damping: 40,
       };
 
       await Promise.all([
-        animate(pageDev, { transform: "translateX(100%)" }, springConfig).finished,
+        animate(leave, { transform: "translateX(100%)" }, springConfig).finished,
         animate(pageHome, { transform: "translateX(0%)" }, springConfig).finished,
       ]);
       currentPage = "home";
-      pageDev.style.zIndex = "0";
+      leave.style.zIndex = "0";
     }
     pageHost.style.pointerEvents = "";
     isTransitioning = false;
@@ -718,9 +727,19 @@ export function initApp() {
   const devInfoMac = document.querySelector<HTMLDivElement>("#devInfoMac");
   const devInfoRssi = document.querySelector<HTMLDivElement>("#devInfoRssi");
   const devInfoWheel = document.querySelector<HTMLDivElement>("#devInfoWheel");
+  const infoName = document.querySelector<HTMLDivElement>("#settingsName");
+  const infoFirmware = document.querySelector<HTMLDivElement>("#settingsFirmware");
+  const infoMac = document.querySelector<HTMLDivElement>("#settingsMac");
+  const infoRssi = document.querySelector<HTMLDivElement>("#settingsRssi");
+  const infoWheel = document.querySelector<HTMLDivElement>("#settingsWheel");
 
   function setDevInfo(target: HTMLDivElement | null, value: string) {
     if (target) target.textContent = value;
+  }
+
+  function setInfoPair(value: string, devTarget: HTMLDivElement | null, infoTarget: HTMLDivElement | null) {
+    setDevInfo(devTarget, value);
+    setDevInfo(infoTarget, value);
   }
 
   async function requestDeviceInfo(commandId: number) {
@@ -812,6 +831,9 @@ export function initApp() {
   });
   registerButton.addEventListener("click", registerDevice);
   appTitle.addEventListener("click", onDevClick);
+  navSettings.addEventListener("click", () => {
+    navigate("settings");
+  });
   navBackButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
       navigate("home");
@@ -881,25 +903,25 @@ export function initApp() {
     }
     if (p.vendor_id === 0x5054 && p.command === 0x0451 && p.ack) {
       const name = new TextDecoder().decode(new Uint8Array(dataPayload)).trim();
-      if (name) setDevInfo(devInfoName, name);
+      if (name) setInfoPair(name, devInfoName, infoName);
     }
     if (p.vendor_id === 0x5054 && p.command === 0x0452 && p.ack) {
       const firmware = new TextDecoder().decode(new Uint8Array(dataPayload)).trim();
-      if (firmware) setDevInfo(devInfoFirmware, firmware);
+      if (firmware) setInfoPair(firmware, devInfoFirmware, infoFirmware);
     }
     if (p.vendor_id === 0x5054 && p.command === 0x0453 && p.ack) {
       const mac = new TextDecoder().decode(new Uint8Array(dataPayload)).trim();
-      if (mac) setDevInfo(devInfoMac, mac);
+      if (mac) setInfoPair(mac, devInfoMac, infoMac);
     }
     if (p.vendor_id === 0x5054 && p.command === 0x0454 && p.ack) {
       if (dataPayload.length >= 1) {
         const rssi = (dataPayload[0] & 0x80) ? dataPayload[0] - 256 : dataPayload[0];
-        setDevInfo(devInfoRssi, `${rssi} dBm`);
+        setInfoPair(`${rssi} dBm`, devInfoRssi, infoRssi);
       }
     }
     if (p.vendor_id === 0x5054 && p.command === 0x0457 && p.ack) {
       if (dataPayload.length >= 1) {
-        setDevInfo(devInfoWheel, String(dataPayload[0]));
+        setInfoPair(String(dataPayload[0]), devInfoWheel, infoWheel);
       }
     }
     if (p.vendor_id === 0x5054 && p.command === 0x0456 && p.ack) {

@@ -39,13 +39,10 @@ export function renderDevPage() {
           </div>
         </section>
         <section>
-          <h2>기기 정보</h2>
+          <h2>STONE 정보</h2>
           <div class="card">
             <div class="grid dev-info-grid">
               <div>이름</div><div id="devInfoName">--</div>
-              <div>펌웨어</div><div id="devInfoFirmware">--</div>
-              <div>MAC</div><div id="devInfoMac">--</div>
-              <div>RSSI</div><div id="devInfoRssi">--</div>
               <div>휠 카운트</div><div id="devInfoWheel">--</div>
             </div>
           </div>

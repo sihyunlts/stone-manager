@@ -105,8 +105,29 @@ body {
   display: none;
 }
 
-.page[data-page="dev"] .nav-back {
+.page[data-page="dev"] .nav-back,
+.page[data-page="settings"] .nav-back {
   display: inline-flex;
+}
+
+.nav-info {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.page[data-page="home"] .nav-info {
+  display: inline-flex;
+}
+
+.page[data-page="dev"] .nav-info,
+.page[data-page="settings"] .nav-info {
+  display: none;
 }
 
 .header-spacer {
