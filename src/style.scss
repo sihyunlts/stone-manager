@@ -1,5 +1,6 @@
 @import "pretendard/dist/web/static/pretendard.css";
 @import "./styles/header.scss";
+@import "./styles/range.scss";
 
 :root {
   color-scheme: dark;
@@ -135,35 +136,6 @@ section {
 
 #volumeSlider {
   flex: 1;
-}
-
-.range {
-  --range-progress: 0%;
-  --range-track: var(--border);
-  --range-fill: var(--accent);
-  appearance: none;
-  width: 100%;
-  height: 20px;
-  border: 0;
-  cursor: pointer;
-
-  &::-webkit-slider-runnable-track {
-    height: 4px;
-    background:
-      linear-gradient(var(--range-fill) 0 0) 0/var(--range-progress) 6px no-repeat,
-      var(--range-track);
-    border-radius: 999px;
-  }
-
-  &::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    border: 4px solid var(--accent);
-    background: var(--bg);
-    margin-top: -8px;
-  }
 }
 
 .toggle-row {

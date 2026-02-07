@@ -5,6 +5,7 @@ import { bindDevPage, renderDevPage } from "./dev";
 import { renderSettingsPage } from "./settings";
 import { renderConnectPage } from "./connect";
 import { renderHeader } from "./components/header";
+import { renderRange, updateRangeFill } from "./components/range";
 import { animate } from "motion";
 import stoneImg from "./assets/stone.png";
 
@@ -102,7 +103,7 @@ export function initApp() {
               <h2>소리</h2>
               <div class="card">
                 <div class="row volume-row">
-                  <input id="volumeSlider" class="range" type="range" min="0" max="30" step="0.1" value="0" />
+                  ${renderRange({ id: "volumeSlider", min: 0, max: 30, step: 0.1, value: 0 })}
                 </div>
               </div>
             </section>
@@ -119,7 +120,7 @@ export function initApp() {
                 </div>
                 <label class="wide">
                   조명 밝기
-                  <input id="lampBrightness" class="range" type="range" min="0" max="100" step="0.1" value="0" />
+                    ${renderRange({ id: "lampBrightness", min: 0, max: 100, step: 0.1, value: 0, className: "thumb-vertical" })}
                 </label>
                 <label>
                   조명 종류
@@ -432,14 +433,6 @@ export function initApp() {
     volumeValueState = value;
     volumeSlider.value = String(value);
     updateRangeFill(volumeSlider);
-  }
-
-  function updateRangeFill(input: HTMLInputElement) {
-    const min = Number(input.min || 0);
-    const max = Number(input.max || 100);
-    const value = Number(input.value || 0);
-    const percent = max === min ? 0 : ((value - min) / (max - min)) * 100;
-    input.style.setProperty("--range-progress", `${percent}%`);
   }
 
   async function requestVolume() {
