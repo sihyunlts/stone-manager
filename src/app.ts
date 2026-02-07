@@ -194,6 +194,9 @@ export function initApp() {
   function setPage(page: "home" | "dev") {
     document.body.dataset.page = page;
     appTitle.textContent = page === "dev" ? "개발자 메뉴" : "STONE 매니저";
+    if (page === "dev") {
+      requestAllDeviceInfo();
+    }
   }
 
   setPage("home");
@@ -663,7 +666,36 @@ export function initApp() {
   el<HTMLButtonElement>("#refreshDevices").addEventListener("click", refreshDevices);
   el<HTMLButtonElement>("#connect").addEventListener("click", connect);
   el<HTMLButtonElement>("#disconnect").addEventListener("click", disconnect);
-  bindDevPage({ onSend: sendCommand });
+  const devInfoName = document.querySelector<HTMLDivElement>("#devInfoName");
+  const devInfoFirmware = document.querySelector<HTMLDivElement>("#devInfoFirmware");
+  const devInfoMac = document.querySelector<HTMLDivElement>("#devInfoMac");
+  const devInfoRssi = document.querySelector<HTMLDivElement>("#devInfoRssi");
+  const devInfoWheel = document.querySelector<HTMLDivElement>("#devInfoWheel");
+
+  function setDevInfo(target: HTMLDivElement | null, value: string) {
+    if (target) target.textContent = value;
+  }
+
+  async function requestDeviceInfo(commandId: number) {
+    try {
+      await invoke("send_gaia_command", { vendorId: 0x5054, commandId, payload: [] });
+      logLine(`Device info request (${toHex(0x5054, 4)} ${toHex(commandId, 4)})`, "OUT");
+    } catch (err) {
+      logLine(String(err), "SYS");
+    }
+  }
+
+  function requestAllDeviceInfo() {
+    requestDeviceInfo(0x0451).catch(() => {});
+    requestDeviceInfo(0x0452).catch(() => {});
+    requestDeviceInfo(0x0453).catch(() => {});
+    requestDeviceInfo(0x0454).catch(() => {});
+    requestDeviceInfo(0x0457).catch(() => {});
+  }
+
+  bindDevPage({
+    onSend: sendCommand,
+  });
   battery.addEventListener("click", requestBattery);
   setVolumeEnabled(false);
   updateVolumeUI(null);
@@ -796,6 +828,29 @@ export function initApp() {
       if (dataPayload.length >= 1) {
         lastBatteryStep = dataPayload[0];
         updateBatteryLabel();
+      }
+    }
+    if (p.vendor_id === 0x5054 && p.command === 0x0451 && p.ack) {
+      const name = new TextDecoder().decode(new Uint8Array(dataPayload)).trim();
+      if (name) setDevInfo(devInfoName, name);
+    }
+    if (p.vendor_id === 0x5054 && p.command === 0x0452 && p.ack) {
+      const firmware = new TextDecoder().decode(new Uint8Array(dataPayload)).trim();
+      if (firmware) setDevInfo(devInfoFirmware, firmware);
+    }
+    if (p.vendor_id === 0x5054 && p.command === 0x0453 && p.ack) {
+      const mac = new TextDecoder().decode(new Uint8Array(dataPayload)).trim();
+      if (mac) setDevInfo(devInfoMac, mac);
+    }
+    if (p.vendor_id === 0x5054 && p.command === 0x0454 && p.ack) {
+      if (dataPayload.length >= 1) {
+        const rssi = (dataPayload[0] & 0x80) ? dataPayload[0] - 256 : dataPayload[0];
+        setDevInfo(devInfoRssi, `${rssi} dBm`);
+      }
+    }
+    if (p.vendor_id === 0x5054 && p.command === 0x0457 && p.ack) {
+      if (dataPayload.length >= 1) {
+        setDevInfo(devInfoWheel, String(dataPayload[0]));
       }
     }
     if (p.vendor_id === 0x5054 && p.command === 0x0456 && p.ack) {
