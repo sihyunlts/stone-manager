@@ -210,45 +210,44 @@ export function initApp() {
   pageSettings.style.transform = "translateX(100%)";
   pageDev.style.zIndex = "0";
   pageHome.style.zIndex = "1";
+  animate(pageHome, { x: "0%" }, { duration: 0 });
+  animate(pageDev, { x: "100%" }, { duration: 0 });
+  animate(pageSettings, { x: "100%" }, { duration: 0 });
   async function navigate(to: "home" | "dev" | "settings") {
     if (isTransitioning || to === currentPage) return;
     isTransitioning = true;
     pageHost.style.pointerEvents = "none";
     const bring = to === "dev" ? pageDev : to === "settings" ? pageSettings : pageHome;
     const leave = currentPage === "dev" ? pageDev : currentPage === "settings" ? pageSettings : pageHome;
-    if (to === "home") {
-      pageHome.style.transform = "translateX(-100%)";
-    } else {
-      bring.style.transform = "translateX(100%)";
-    }
-    bring.style.zIndex = "2";
-    leave.style.zIndex = "1";
     if (to !== "home") {
+      bring.style.zIndex = "2";
+      leave.style.zIndex = "1";
       const springConfig = {
         type: "spring" as const,
-        stiffness: 300,
-        damping: 30,
-        mass: 1,
+        stiffness: 450,
+        damping: 40
       };
 
       await Promise.all([
-        animate(bring, { transform: "translateX(0%)" }, springConfig).finished,
-        animate(pageHome, { transform: "translateX(-20%)" }, springConfig).finished,
+        animate(bring, { x: ["100%", "0%"] }, springConfig).finished,
+        animate(pageHome, { x: ["0%", "-20%"] }, springConfig).finished,
       ]);
       currentPage = to;
       if (to === "dev" || to === "settings") {
         requestAllDeviceInfo();
       }
     } else {
+      bring.style.zIndex = "1";
+      leave.style.zIndex = "2";
       const springConfig = {
         type: "spring" as const,
-        stiffness: 400,
-        damping: 40,
+        stiffness: 600,
+        damping: 60,
       };
 
       await Promise.all([
-        animate(leave, { transform: "translateX(100%)" }, springConfig).finished,
-        animate(pageHome, { transform: "translateX(0%)" }, springConfig).finished,
+        animate(leave, { x: ["0%", "100%"] }, springConfig).finished,
+        animate(pageHome, { x: ["-20%", "0%"] }, springConfig).finished,
       ]);
       currentPage = "home";
       leave.style.zIndex = "0";
