@@ -98,8 +98,7 @@ export function initApp() {
               <h2>소리</h2>
               <div class="card">
                 <div class="row volume-row">
-                  <input id="volumeSlider" type="range" min="0" max="30" step="1" value="0" />
-                  <div class="volume-value" id="volumeValue">--</div>
+                  <input id="volumeSlider" class="range" type="range" min="0" max="30" step="0.1" value="0" />
                 </div>
               </div>
             </section>
@@ -107,30 +106,31 @@ export function initApp() {
             <section>
               <h2>램프</h2>
               <div class="card">
-                <div class="grid">
-                  <label class="wide">
-                    램프 사용
+                <div class="wide toggle-row">
+                  <span>램프 사용</span>
+                  <label class="toggle-switch">
                     <input id="lampToggle" type="checkbox" />
-                  </label>
-                  <label class="wide">
-                    조명 밝기 <span id="lampBrightnessValue">--</span>
-                    <input id="lampBrightness" type="range" min="0" max="100" step="1" value="0" />
-                  </label>
-                  <label>
-                    조명 종류
-                    <select id="lampType">
-                      <option value="1">단색</option>
-                      <option value="2">촛불</option>
-                      <option value="3">오로라</option>
-                      <option value="4">파도</option>
-                      <option value="5">반딧불</option>
-                    </select>
-                  </label>
-                  <label>
-                    색상
-                    <input id="lampColor" type="color" value="#ffffff" />
+                    <span class="toggle-track"></span>
                   </label>
                 </div>
+                <label class="wide">
+                  조명 밝기
+                  <input id="lampBrightness" class="range" type="range" min="0" max="100" step="0.1" value="0" />
+                </label>
+                <label>
+                  조명 종류
+                  <select id="lampType">
+                    <option value="1">단색</option>
+                    <option value="2">촛불</option>
+                    <option value="3">오로라</option>
+                    <option value="4">파도</option>
+                    <option value="5">반딧불</option>
+                  </select>
+                </label>
+                <label>
+                  색상
+                  <input id="lampColor" type="color" value="#ffffff" />
+                </label>
               </div>
             </section>
 
@@ -155,10 +155,8 @@ export function initApp() {
   const status = el<HTMLDivElement>("#status");
   const battery = el<HTMLDivElement>("#battery");
   const volumeSlider = el<HTMLInputElement>("#volumeSlider");
-  const volumeValue = el<HTMLDivElement>("#volumeValue");
   const lampToggle = el<HTMLInputElement>("#lampToggle");
   const lampBrightness = el<HTMLInputElement>("#lampBrightness");
-  const lampBrightnessValue = el<HTMLSpanElement>("#lampBrightnessValue");
   const lampType = el<HTMLSelectElement>("#lampType");
   const lampColor = el<HTMLInputElement>("#lampColor");
   const registerList = el<HTMLSelectElement>("#registerList");
@@ -359,12 +357,11 @@ export function initApp() {
 
   function updateLampUI() {
     if (lampBrightnessState === null) {
-      lampBrightnessValue.textContent = "--";
       lampBrightness.value = "0";
     } else {
-      lampBrightnessValue.textContent = String(lampBrightnessState);
       lampBrightness.value = String(lampBrightnessState);
     }
+    updateRangeFill(lampBrightness);
     lampToggle.checked = lampOnState;
     lampType.value = String(lampTypeState);
     lampColor.value = lampColorState;
@@ -390,7 +387,8 @@ export function initApp() {
   }
 
   async function setLampBrightness(value: number) {
-    await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0202, payload: [value] });
+    const rounded = Math.round(value);
+    await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0202, payload: [rounded] });
   }
 
   async function setLampType(value: number) {
@@ -404,10 +402,11 @@ export function initApp() {
 
   async function runLamp(mood: number, type: number, color: string) {
     const [r, g, b] = parseColorHex(color);
+    const rounded = Math.round(mood);
     await invoke("send_gaia_command", {
       vendorId: 0x5054,
       commandId: 0x0212,
-      payload: [mood, type, r, g, b],
+      payload: [rounded, type, r, g, b],
     });
   }
 
@@ -422,13 +421,21 @@ export function initApp() {
   function updateVolumeUI(value: number | null) {
     if (value === null || Number.isNaN(value)) {
       volumeValueState = null;
-      volumeValue.textContent = "--";
       volumeSlider.value = "0";
+      updateRangeFill(volumeSlider);
       return;
     }
     volumeValueState = value;
     volumeSlider.value = String(value);
-    volumeValue.textContent = String(value);
+    updateRangeFill(volumeSlider);
+  }
+
+  function updateRangeFill(input: HTMLInputElement) {
+    const min = Number(input.min || 0);
+    const max = Number(input.max || 100);
+    const value = Number(input.value || 0);
+    const percent = max === min ? 0 : ((value - min) / (max - min)) * 100;
+    input.style.setProperty("--range-progress", `${percent}%`);
   }
 
   async function requestVolume() {
@@ -442,7 +449,8 @@ export function initApp() {
 
   async function setVolume(value: number) {
     try {
-      await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0201, payload: [value] });
+      const rounded = Math.round(value);
+      await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0201, payload: [rounded] });
     } catch (err) {
       logLine(String(err), "SYS");
     }
@@ -841,6 +849,7 @@ export function initApp() {
       if (!lampOnState) return;
       setLampBrightness(value).catch((err) => logLine(String(err), "SYS"));
     }, 150);
+    updateRangeFill(lampBrightness);
   });
   lampType.addEventListener("change", () => {
     if (lampType.disabled) return;
