@@ -21,6 +21,12 @@ export function renderSettingsPage() {
         id: "settingsAppVersionRow",
       }),
       renderListItem({
+        label: "GitHub 저장소",
+        value: "sihyunlts/stone-manager",
+        clickable: true,
+        data: { url: "https://github.com/sihyunlts/stone-manager" },
+      }),
+      renderListItem({
         label: "오픈소스 라이선스",
         id: "navLicenses",
         clickable: true,
