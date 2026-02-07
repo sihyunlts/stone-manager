@@ -37,47 +37,42 @@ body {
 
 .app-shell {
   min-height: 100vh;
-  padding-top: 80px;
+}
+
+#pageHost {
+  position: relative;
+  height: 100vh;
+  overflow: hidden;
+  width: 100%;
+}
+
+.page {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .layout {
   max-width: 1000px;
   margin: 0 auto;
+  width: 100%;
   padding: 20px 20px 28px;
   display: flex;
   flex-direction: column;
   gap: 20px;
-}
-
-body[data-page="home"] #mainPage {
-  display: flex;
-}
-
-body[data-page="home"] #devPage {
-  display: none;
-}
-
-body[data-page="dev"] #mainPage {
-  display: none;
-}
-
-body[data-page="dev"] #devPage {
-  display: flex;
-}
-
-body[data-page="home"] .nav-back {
-  display: none;
-}
-
-body[data-page="dev"] .nav-back {
-  display: inline-flex;
+  flex: 1;
+  overflow: auto;
+  min-width: 0;
 }
 
 .app-header {
-  position: fixed;
+  position: sticky;
   top: 0;
-  left: 0;
-  right: 0;
   height: 80px;
   display: flex;
   align-items: center;
@@ -86,7 +81,7 @@ body[data-page="dev"] .nav-back {
   background: rgba(19, 19, 20, 0.85);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(10px);
-  z-index: 10;
+  z-index: 2;
 }
 
 .app-title {
@@ -104,6 +99,14 @@ body[data-page="dev"] .nav-back {
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.page[data-page="home"] .nav-back {
+  display: none;
+}
+
+.page[data-page="dev"] .nav-back {
+  display: inline-flex;
 }
 
 .header-spacer {

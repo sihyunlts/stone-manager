@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type Event } from "@tauri-apps/api/event";
 import { bindDevPage, renderDevPage } from "./dev";
+import { animate } from "motion";
 
 type GaiaPacketEvent = {
   vendor_id: number;
@@ -74,90 +75,95 @@ export function initApp() {
   const app = el<HTMLDivElement>("#app");
   app.innerHTML = `
     <div class="app-shell">
-      <div class="app-header" data-tauri-drag-region>
-        <button class="nav-back" id="navBack" data-tauri-drag-region="false">뒤로</button>
-        <div class="app-title" id="appTitle" data-tauri-drag-region="false">STONE 매니저</div>
-        <div class="header-spacer"></div>
+      <div id="pageHost">
+        <div class="page" id="page-home" data-page="home">
+          <div class="app-header" data-tauri-drag-region>
+            <button class="nav-back" data-tauri-drag-region="false">뒤로</button>
+            <div class="app-title" id="appTitle" data-tauri-drag-region="false">STONE 매니저</div>
+            <div class="header-spacer"></div>
+          </div>
+          <main class="layout">
+            <header class="card">
+              <div class="status-row">
+                <div class="status" id="status">STONE이 연결되지 않음</div>
+                <div class="battery" id="battery">배터리: --</div>
+              </div>
+            </header>
+
+            <section>
+              <h2>소리</h2>
+              <div class="card">
+                <div class="row volume-row">
+                  <input id="volumeSlider" type="range" min="0" max="30" step="1" value="0" />
+                  <div class="volume-value" id="volumeValue">--</div>
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <h2>램프</h2>
+              <div class="card">
+                <div class="grid">
+                  <label class="wide">
+                    램프 사용
+                    <input id="lampToggle" type="checkbox" />
+                  </label>
+                  <label class="wide">
+                    조명 밝기 <span id="lampBrightnessValue">--</span>
+                    <input id="lampBrightness" type="range" min="0" max="100" step="1" value="0" />
+                  </label>
+                  <label>
+                    조명 종류
+                    <select id="lampType">
+                      <option value="1">단색</option>
+                      <option value="2">촛불</option>
+                      <option value="3">오로라</option>
+                      <option value="4">파도</option>
+                      <option value="5">반딧불</option>
+                    </select>
+                  </label>
+                  <label>
+                    색상
+                    <input id="lampColor" type="color" value="#ffffff" />
+                  </label>
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <h2>기기 등록</h2>
+              <div class="card">
+                <div class="row">
+                  <select id="registerList"></select>
+                  <button id="registerDevice">등록</button>
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <h2>연결</h2>
+              <div class="card">
+                <div class="row">
+                  <button id="refreshDevices">새로고침</button>
+                  <select id="registeredList"></select>
+                  <button id="connect">연결</button>
+                  <button id="disconnect">연결 끊기</button>
+                  <button id="removeRegistered">삭제</button>
+                </div>
+              </div>
+            </section>
+          </main>
+        </div>
+        ${renderDevPage()}
       </div>
-
-      <main class="layout" id="mainPage">
-        <header class="card">
-          <div class="status-row">
-            <div class="status" id="status">STONE이 연결되지 않음</div>
-            <div class="battery" id="battery">배터리: --</div>
-          </div>
-        </header>
-
-        <section>
-          <h2>소리</h2>
-          <div class="card">
-            <div class="row volume-row">
-              <input id="volumeSlider" type="range" min="0" max="30" step="1" value="0" />
-              <div class="volume-value" id="volumeValue">--</div>
-            </div>
-          </div>
-        </section>
-
-                <section>
-          <h2>램프</h2>
-          <div class="card">
-            <div class="grid">
-              <label class="wide">
-                램프 사용
-                <input id="lampToggle" type="checkbox" />
-              </label>
-              <label class="wide">
-                조명 밝기 <span id="lampBrightnessValue">--</span>
-                <input id="lampBrightness" type="range" min="0" max="100" step="1" value="0" />
-              </label>
-              <label>
-                조명 종류
-                <select id="lampType">
-                  <option value="1">단색</option>
-                  <option value="2">촛불</option>
-                  <option value="3">오로라</option>
-                  <option value="4">파도</option>
-                  <option value="5">반딧불</option>
-                </select>
-              </label>
-              <label>
-                색상
-                <input id="lampColor" type="color" value="#ffffff" />
-              </label>
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <h2>기기 등록</h2>
-          <div class="card">
-            <div class="row">
-              <select id="registerList"></select>
-              <button id="registerDevice">등록</button>
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <h2>연결</h2>
-          <div class="card">
-            <div class="row">
-              <button id="refreshDevices">새로고침</button>
-              <select id="registeredList"></select>
-              <button id="connect">연결</button>
-              <button id="disconnect">연결 끊기</button>
-              <button id="removeRegistered">삭제</button>
-            </div>
-          </div>
-        </section>
-
-      </main>
-      ${renderDevPage()}
     </div>
   `;
 
   const appTitle = el<HTMLDivElement>("#appTitle");
-  const navBack = el<HTMLButtonElement>("#navBack");
+  const navBackButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-back"));
+  const pageHost = el<HTMLDivElement>("#pageHost");
+  const pageHome = el<HTMLDivElement>("#page-home");
+  const pageDev = el<HTMLDivElement>("#page-dev");
   const status = el<HTMLDivElement>("#status");
   const battery = el<HTMLDivElement>("#battery");
   const volumeSlider = el<HTMLInputElement>("#volumeSlider");
@@ -191,15 +197,56 @@ export function initApp() {
   let devClicks = 0;
   let devClickTimer: ReturnType<typeof setTimeout> | null = null;
 
-  function setPage(page: "home" | "dev") {
-    document.body.dataset.page = page;
-    appTitle.textContent = page === "dev" ? "개발자 메뉴" : "STONE 매니저";
-    if (page === "dev") {
-      requestAllDeviceInfo();
-    }
-  }
+  let currentPage: "home" | "dev" = "home";
+  let isTransitioning = false;
 
-  setPage("home");
+  pageHome.style.transform = "translateX(0)";
+  pageHome.style.filter = "brightness(1)";
+  pageDev.style.transform = "translateX(100%)";
+  pageDev.style.zIndex = "0";
+  pageHome.style.zIndex = "1";
+  async function navigate(to: "home" | "dev") {
+    if (isTransitioning || to === currentPage) return;
+    isTransitioning = true;
+    pageHost.style.pointerEvents = "none";
+    if (to === "dev") {
+      pageDev.style.transform = "translateX(100%)";
+      pageDev.style.zIndex = "2";
+      pageHome.style.zIndex = "1";
+      
+      const springConfig = { 
+        type: "spring" as const, 
+        stiffness: 300, 
+        damping: 30,
+        mass: 1
+      };
+
+      await Promise.all([
+        animate(pageDev, { transform: "translateX(0%)" }, springConfig).finished,
+        animate(pageHome, { transform: "translateX(-20%)" }, springConfig).finished,
+      ]);
+      currentPage = "dev";
+      requestAllDeviceInfo();
+    } else {
+      pageDev.style.zIndex = "2";
+      pageHome.style.zIndex = "1";
+
+      const springConfig = { 
+        type: "spring" as const, 
+        stiffness: 400, 
+        damping: 40 
+      };
+
+      await Promise.all([
+        animate(pageDev, { transform: "translateX(100%)" }, springConfig).finished,
+        animate(pageHome, { transform: "translateX(0%)" }, springConfig).finished,
+      ]);
+      currentPage = "home";
+      pageDev.style.zIndex = "0";
+    }
+    pageHost.style.pointerEvents = "";
+    isTransitioning = false;
+  }
 
   function logLine(line: string, tone: "IN" | "OUT" | "SYS" = "SYS") {
     void invoke("log_line", { line, tone, ts: "" });
@@ -217,7 +264,7 @@ export function initApp() {
       devClicks = 0;
       devEnabled = true;
       logLine("Developer menu unlocked", "SYS");
-      setPage("dev");
+      navigate("dev");
     }
   }
 
@@ -765,8 +812,10 @@ export function initApp() {
   });
   registerButton.addEventListener("click", registerDevice);
   appTitle.addEventListener("click", onDevClick);
-  navBack.addEventListener("click", () => {
-    setPage("home");
+  navBackButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      navigate("home");
+    });
   });
   removeButton.addEventListener("click", () => {
     const address = registeredList.value;
