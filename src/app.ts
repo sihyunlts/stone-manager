@@ -3,6 +3,7 @@ import { listen, type Event } from "@tauri-apps/api/event";
 import { bindDevPage, renderDevPage } from "./dev";
 import { renderSettingsPage } from "./settings";
 import { animate } from "motion";
+import stoneImg from "./assets/stone.png";
 
 type GaiaPacketEvent = {
   vendor_id: number;
@@ -78,18 +79,17 @@ export function initApp() {
     <div class="app-shell">
       <div id="pageHost">
         <div class="page" id="page-home" data-page="home">
-          <div class="app-header" data-tauri-drag-region>
+          <header class="app-header" data-tauri-drag-region>
             <button class="nav-back" data-tauri-drag-region="false">뒤로</button>
             <div class="app-title" id="appTitle" data-tauri-drag-region="false">STONE 매니저</div>
             <button class="nav-info" id="navSettings" data-tauri-drag-region="false">설정</button>
-          </div>
+          </header>
           <main class="layout">
-            <header class="card">
-              <div class="status-row">
-                <div class="status" id="status">STONE이 연결되지 않음</div>
-                <div class="battery" id="battery">배터리: --</div>
-              </div>
-            </header>
+            <section class="statusSection">
+              <img src="${stoneImg}" class="device-image"/>
+              <span class="status" id="status">STONE이 연결되지 않음</span>
+              <span class="battery" id="battery">--</span>
+            </section>
 
             <section>
               <h2>소리</h2>
@@ -463,7 +463,7 @@ export function initApp() {
         break;
       case "connected": {
         const label = connectedAddress ? getDeviceLabel(connectedAddress) : "Unknown";
-        status.textContent = `연결됨: ${label}`;
+        status.textContent = `${label}`;
         status.classList.add("connected");
         break;
       }
@@ -686,7 +686,7 @@ export function initApp() {
     } else if (isCharging) {
       suffix = " (충전 중)";
     }
-    battery.textContent = `배터리: ${percent}%${suffix}`;
+    battery.textContent = `${percent}%${suffix}`;
     void invoke("set_tray_battery", { percent, charging: isCharging, full: isFull });
   }
 

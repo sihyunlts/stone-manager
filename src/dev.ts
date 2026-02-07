@@ -40,10 +40,14 @@ export function renderDevPage() {
         </section>
         <section>
           <h2>STONE 정보</h2>
-          <div class="card">
-            <div class="grid dev-info-grid">
-              <div>이름</div><div id="devInfoName">--</div>
-              <div>휠 카운트</div><div id="devInfoWheel">--</div>
+          <div class="card list-group">
+            <div class="list-item">
+              <div class="list-label">이름</div>
+              <div class="list-value" id="devInfoName">--</div>
+            </div>
+            <div class="list-item">
+              <div class="list-label">휠 카운트</div>
+              <div class="list-value" id="devInfoWheel">--</div>
             </div>
           </div>
         </section>

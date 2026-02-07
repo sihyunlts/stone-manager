@@ -9,11 +9,18 @@ export function renderSettingsPage() {
       <main class="layout">
         <section>
           <h2>STONE 정보</h2>
-          <div class="card">
-            <div class="grid dev-info-grid">
-              <div>펌웨어 버전</div><div id="settingsFirmware">--</div>
-              <div>MAC</div><div id="settingsMac">--</div>
-              <div>RSSI</div><div id="settingsRssi">--</div>
+          <div class="card list-group">
+            <div class="list-item">
+              <div class="list-label">펌웨어 버전</div>
+              <div class="list-value" id="settingsFirmware">--</div>
+            </div>
+            <div class="list-item">
+              <div class="list-label">MAC 주소</div>
+              <div class="list-value" id="settingsMac">--</div>
+            </div>
+            <div class="list-item">
+              <div class="list-label">신호 강도 (RSSI)</div>
+              <div class="list-value" id="settingsRssi">--</div>
             </div>
           </div>
         </section>
