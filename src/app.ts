@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
 import { listen, type Event } from "@tauri-apps/api/event";
 import { bindDevPage, renderDevPage } from "./dev";
 import { renderSettingsPage } from "./settings";
@@ -731,6 +732,7 @@ export function initApp() {
   const infoMac = document.querySelector<HTMLDivElement>("#settingsMac");
   const infoRssi = document.querySelector<HTMLDivElement>("#settingsRssi");
   const infoWheel = document.querySelector<HTMLDivElement>("#settingsWheel");
+  const settingsAppVersion = document.querySelector<HTMLDivElement>("#settingsAppVersion");
 
   function setDevInfo(target: HTMLDivElement | null, value: string) {
     if (target) target.textContent = value;
@@ -739,6 +741,16 @@ export function initApp() {
   function setInfoPair(value: string, devTarget: HTMLDivElement | null, infoTarget: HTMLDivElement | null) {
     setDevInfo(devTarget, value);
     setDevInfo(infoTarget, value);
+  }
+
+  async function loadAppVersion() {
+    if (!settingsAppVersion) return;
+    try {
+      const version = await getVersion();
+      settingsAppVersion.textContent = version || "--";
+    } catch {
+      settingsAppVersion.textContent = "--";
+    }
   }
 
   async function requestDeviceInfo(commandId: number) {
@@ -761,6 +773,7 @@ export function initApp() {
   bindDevPage({
     onSend: sendCommand,
   });
+  loadAppVersion().catch(() => {});
   battery.addEventListener("click", requestBattery);
   setVolumeEnabled(false);
   updateVolumeUI(null);
