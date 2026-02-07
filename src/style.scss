@@ -1,7 +1,7 @@
-@import "pretendard/dist/web/static/pretendard.css";
-@import "./styles/header.scss";
-@import "./styles/range.scss";
-@import "./styles/toggle.scss";
+@use "pretendard/dist/web/static/pretendard.css";
+@use "styles/header";
+@use "styles/range";
+@use "styles/toggle";
 
 :root {
   color-scheme: dark;
