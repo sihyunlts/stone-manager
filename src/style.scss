@@ -2,6 +2,8 @@
 @use "styles/header";
 @use "styles/range";
 @use "styles/toggle";
+@use "styles/list";
+@use "styles/section";
 
 :root {
   color-scheme: dark;
@@ -105,19 +107,6 @@ body {
   margin-bottom: 8px;
 }
 
-section {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-
-  h2 {
-    margin: 0 0 4px 4px;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--accent);
-  }
-}
-
 .card {
   background: var(--card);
   border-radius: 8px;
@@ -166,38 +155,6 @@ button {
 
   &#disconnect {
     background: var(--accent-2);
-  }
-}
-
-.list-item {
-  padding: 18px 18px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-height: 72px;
-  position: relative;
-
-  &:not(:last-child)::after {
-    content: "";
-    position: absolute;
-    bottom: 0;
-    left: 20px;
-    right: 0px;
-    height: 1px;
-    background-color: var(--border);
-  }
-
-  .list-label {
-    font-size: 17px;
-    font-weight: 400;
-    color: var(--ink);
-    margin-bottom: 8px;
-  }
-
-  .list-value {
-    font-size: 15px;
-    font-weight: 400;
-    color: var(--muted);
   }
 }
 

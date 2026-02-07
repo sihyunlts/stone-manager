@@ -1,0 +1,42 @@
+.list-item {
+  padding: 18px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 72px;
+  position: relative;
+
+  &:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 20px;
+    right: 0px;
+    height: 1px;
+    background-color: var(--border);
+  }
+
+  .list-label {
+    font-size: 17px;
+    font-weight: 400;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+
+  .list-value {
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--muted);
+  }
+}
+
+.list-item--row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  .list-label {
+    margin-bottom: 0;
+  }
+}

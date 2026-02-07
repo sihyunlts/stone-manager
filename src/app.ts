@@ -7,6 +7,7 @@ import { renderConnectPage } from "./connect";
 import { renderHeader } from "./components/header";
 import { renderRange, updateRangeFill } from "./components/range";
 import { renderToggle } from "./components/toggle";
+import { renderListItem } from "./components/list";
 import { animate } from "motion";
 import stoneImg from "./assets/stone.png";
 
@@ -111,11 +112,10 @@ export function initApp() {
 
             <section>
               <h2>램프</h2>
+              <div class="card list-group">
+                ${renderListItem({ label: "램프 사용", right: renderToggle({ id: "lampToggle" }) })}
+              </div>
               <div class="card">
-                <div class="wide toggle-row">
-                  <span>램프 사용</span>
-                  ${renderToggle({ id: "lampToggle" })}
-                </div>
                 <label class="wide">
                   조명 밝기
                     ${renderRange({ id: "lampBrightness", min: 0, max: 100, step: 0.1, value: 0, className: "thumb-vertical" })}

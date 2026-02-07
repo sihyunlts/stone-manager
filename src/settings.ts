@@ -1,36 +1,34 @@
 import { renderHeader } from "./components/header";
+import { renderList, renderListItem } from "./components/list";
+import { renderSection } from "./components/section";
 
 export function renderSettingsPage() {
+  const stoneInfo = renderSection({
+    title: "STONE 정보",
+    body: renderList([
+      renderListItem({ label: "펌웨어 버전", valueId: "settingsFirmware" }),
+      renderListItem({ label: "MAC 주소", valueId: "settingsMac" }),
+      renderListItem({ label: "신호 강도 (RSSI)", valueId: "settingsRssi" }),
+    ]),
+  });
+
+  const appInfo = renderSection({
+    title: "앱 정보",
+    body: renderList([
+      renderListItem({
+        label: "버전",
+        valueId: "settingsAppVersion",
+        id: "settingsAppVersionRow",
+      }),
+    ]),
+  });
+
   return `
     <div class="page" id="page-settings" data-page="settings">
       ${renderHeader({ title: "설정", showBack: true })}
       <main class="layout">
-        <section>
-          <h2>STONE 정보</h2>
-          <div class="card list-group">
-            <div class="list-item">
-              <div class="list-label">펌웨어 버전</div>
-              <div class="list-value" id="settingsFirmware">--</div>
-            </div>
-            <div class="list-item">
-              <div class="list-label">MAC 주소</div>
-              <div class="list-value" id="settingsMac">--</div>
-            </div>
-            <div class="list-item">
-              <div class="list-label">신호 강도 (RSSI)</div>
-              <div class="list-value" id="settingsRssi">--</div>
-            </div>
-          </div>
-        </section>
-        <section>
-          <h2>앱 정보</h2>
-          <div class="card list-group">
-            <div class="list-item" id="settingsAppVersionRow">
-              <div class="list-label">버전</div>
-              <div class="list-value" id="settingsAppVersion">--</div>
-            </div>
-          </div>
-        </section>
+        ${stoneInfo}
+        ${appInfo}
       </main>
     </div>
   `;
