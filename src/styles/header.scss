@@ -9,24 +9,24 @@
   background: rgba(19, 19, 20, 0.85);
   backdrop-filter: blur(12px);
   z-index: 2;
-}
 
-.app-title {
-  font-weight: 600;
-  font-size: 22px;
-  flex: 1;
-}
+  .app-title {
+    font-weight: 400;
+    font-size: 22px;
+    flex: 1;
+  }
 
-.header-left {
-  display: flex;
-  align-items: center;
-}
+  .header-left {
+    display: flex;
+    align-items: center;
+  }
 
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: flex-end;
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-end;
+  }
 }
 
 .nav-back,

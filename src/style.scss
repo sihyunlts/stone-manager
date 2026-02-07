@@ -1,5 +1,5 @@
 @import "pretendard/dist/web/static/pretendard.css";
-@import "./styles/header.css";
+@import "./styles/header.scss";
 
 :root {
   color-scheme: dark;
@@ -71,19 +71,18 @@ body {
   min-width: 0;
 }
 
-
 .status {
   color: var(--muted);
   font-weight: 500;
   font-size: 20px;
+
+  &.connected {
+    color: var(--ink);
+  }
 }
 
 .battery {
   color: var(--muted);
-}
-
-.status.connected {
-  color: var(--ink)
 }
 
 .statusSection {
@@ -101,19 +100,26 @@ section {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
 
-h2 {
-  margin: 0 0 4px 4px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--accent);
+  h2 {
+    margin: 0 0 4px 4px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--accent);
+  }
 }
 
 .card {
   background: var(--card);
   border-radius: 8px;
   padding: 20px;
+
+  &.list-group {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
 }
 
 .row {
@@ -121,11 +127,10 @@ h2 {
   gap: 12px;
   flex-wrap: wrap;
   align-items: center;
-}
 
-.volume-row {
-  width: 100%;
-  align-items: center;
+  &.volume-row {
+    width: 100%;
+  }
 }
 
 #volumeSlider {
@@ -141,24 +146,24 @@ h2 {
   height: 20px;
   border: 0;
   cursor: pointer;
-}
 
-.range::-webkit-slider-runnable-track {
-  height: 4px;
-  background:
-    linear-gradient(var(--range-fill) 0 0) 0/var(--range-progress) 6px no-repeat,
-    var(--range-track);
-  border-radius: 999px;
-}
+  &::-webkit-slider-runnable-track {
+    height: 4px;
+    background:
+      linear-gradient(var(--range-fill) 0 0) 0/var(--range-progress) 6px no-repeat,
+      var(--range-track);
+    border-radius: 999px;
+  }
 
-.range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 4px solid var(--accent);
-  background: var(--bg);
-  margin-top: -8px;
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 4px solid var(--accent);
+    background: var(--bg);
+    margin-top: -8px;
+  }
 }
 
 .toggle-row {
@@ -172,45 +177,45 @@ h2 {
   position: relative;
   display: inline-flex;
   align-items: center;
-}
 
-.toggle-switch input {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  opacity: 0;
-  cursor: pointer;
-}
+  input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
 
-.toggle-track {
-  width: 48px;
-  height: 28px;
-  background: var(--border);
-  border-radius: 999px;
-  position: relative;
-  transition: background 200ms ease;
-}
+    &:checked + .toggle-track {
+      background: var(--accent);
 
-.toggle-track::after {
-  content: "";
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--card);
-  transition: transform 200ms ease;
-}
+      &::after {
+        transform: translateX(20px);
+      }
+    }
+  }
 
-.toggle-switch input:checked + .toggle-track {
-  background: var(--accent);
-}
+  .toggle-track {
+    width: 48px;
+    height: 28px;
+    background: var(--border);
+    border-radius: 999px;
+    position: relative;
+    transition: background 200ms ease;
 
-.toggle-switch input:checked + .toggle-track::after {
-  transform: translateX(20px);
+    &::after {
+      content: "";
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--card);
+      transition: transform 200ms ease;
+    }
+  }
 }
 
 input,
@@ -230,19 +235,10 @@ button {
   cursor: pointer;
   border: none;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
 
-button#disconnect {
-  background: var(--accent-2);
-}
-
-/* List Group Styles */
-.card.list-group {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--card);
-  overflow: hidden;
+  &#disconnect {
+    background: var(--accent-2);
+  }
 }
 
 .list-item {
@@ -252,29 +248,29 @@ button#disconnect {
   justify-content: center;
   min-height: 72px;
   position: relative;
-}
 
-.list-item:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 20px;
-  right: 0px;
-  height: 1px;
-  background-color: var(--border)
-}
+  &:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 20px;
+    right: 0px;
+    height: 1px;
+    background-color: var(--border);
+  }
 
-.list-label {
-  font-size: 17px;
-  font-weight: 400;
-  color: var(--ink);
-  margin-bottom: 8px;
-}
+  .list-label {
+    font-size: 17px;
+    font-weight: 400;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
 
-.list-value {
-  font-size: 15px;
-  font-weight: 400;
-  color: var(--muted);
+  .list-value {
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--muted);
+  }
 }
 
 @media (max-width: 720px) {
