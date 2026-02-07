@@ -6,6 +6,7 @@ import { renderSettingsPage } from "./settings";
 import { renderConnectPage } from "./connect";
 import { renderHeader } from "./components/header";
 import { renderRange, updateRangeFill } from "./components/range";
+import { renderToggle } from "./components/toggle";
 import { animate } from "motion";
 import stoneImg from "./assets/stone.png";
 
@@ -113,10 +114,7 @@ export function initApp() {
               <div class="card">
                 <div class="wide toggle-row">
                   <span>램프 사용</span>
-                  <label class="toggle-switch">
-                    <input id="lampToggle" type="checkbox" />
-                    <span class="toggle-track"></span>
-                  </label>
+                  ${renderToggle({ id: "lampToggle" })}
                 </div>
                 <label class="wide">
                   조명 밝기

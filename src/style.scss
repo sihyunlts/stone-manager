@@ -1,6 +1,7 @@
 @import "pretendard/dist/web/static/pretendard.css";
 @import "./styles/header.scss";
 @import "./styles/range.scss";
+@import "./styles/toggle.scss";
 
 :root {
   color-scheme: dark;
@@ -92,6 +93,13 @@ body {
   gap: 12px;
 }
 
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .device-image {
   width: 200px;
   margin-bottom: 8px;
@@ -136,58 +144,6 @@ section {
 
 #volumeSlider {
   flex: 1;
-}
-
-.toggle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.toggle-switch {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-
-  input {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    opacity: 0;
-    cursor: pointer;
-
-    &:checked + .toggle-track {
-      background: var(--accent);
-
-      &::after {
-        transform: translateX(20px);
-      }
-    }
-  }
-
-  .toggle-track {
-    width: 48px;
-    height: 28px;
-    background: var(--border);
-    border-radius: 999px;
-    position: relative;
-    transition: background 200ms ease;
-
-    &::after {
-      content: "";
-      position: absolute;
-      top: 4px;
-      left: 4px;
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: var(--card);
-      transition: transform 200ms ease;
-    }
-  }
 }
 
 input,

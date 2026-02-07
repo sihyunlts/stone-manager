@@ -1,0 +1,40 @@
+.toggle-switch {
+  cursor: pointer;
+
+  input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    z-index: 1;
+
+    &:checked + .toggle-track {
+      background: var(--accent);
+
+      &::after {
+        transform: translateX(20px);
+      }
+    }
+  }
+
+  .toggle-track {
+    width: 48px;
+    height: 28px;
+    background: var(--border);
+    border-radius: 999px;
+    position: relative;
+    display: block;
+    transition: background 200ms ease;
+
+    &::after {
+      content: "";
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--bg);
+      transition: transform 200ms ease;
+    }
+  }
+}
