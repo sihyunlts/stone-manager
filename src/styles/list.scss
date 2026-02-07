@@ -3,8 +3,9 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 72px;
   position: relative;
+  transition: background-color 0.1s ease;
+  gap: 8px;
 
   &:not(:last-child)::after {
     content: "";
@@ -20,7 +21,6 @@
     font-size: 17px;
     font-weight: 400;
     color: var(--ink);
-    margin-bottom: 8px;
   }
 
   .list-value {
@@ -43,9 +43,12 @@
 
 .list-item.clickable {
   cursor: pointer;
-  transition: background-color 0.1s ease;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
 
   &:active {
-    background-color: rgba(255, 255, 255, 0.08);
+    background-color: rgba(255, 255, 255, 0.1);
   }
 }
