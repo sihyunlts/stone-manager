@@ -4,6 +4,7 @@ import { listen, type Event } from "@tauri-apps/api/event";
 import { bindDevPage, renderDevPage } from "./dev";
 import { renderSettingsPage } from "./settings";
 import { renderConnectPage } from "./connect";
+import { renderHeader } from "./components/header";
 import { animate } from "motion";
 import stoneImg from "./assets/stone.png";
 
@@ -81,12 +82,15 @@ export function initApp() {
     <div class="app-shell">
       <div id="pageHost">
         <div class="page" id="page-home" data-page="home">
-          <header class="app-header" data-tauri-drag-region>
-            <button class="nav-back" data-tauri-drag-region="false">뒤로</button>
-            <div class="app-title" id="appTitle" data-tauri-drag-region="false">STONE 매니저</div>
-            <button class="nav-connect" id="navConnect" data-tauri-drag-region="false">연결</button>
-            <button class="nav-info" id="navSettings" data-tauri-drag-region="false">설정</button>
-          </header>
+          ${renderHeader({
+            title: "STONE 매니저",
+            titleId: "appTitle",
+            showBack: false,
+            right: `
+              <button class="nav-connect" id="navConnect" data-tauri-drag-region="false">연결</button>
+              <button class="nav-info" id="navSettings" data-tauri-drag-region="false">설정</button>
+            `,
+          })}
           <main class="layout">
             <section class="statusSection">
               <img src="${stoneImg}" class="device-image"/>

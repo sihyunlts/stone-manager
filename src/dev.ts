@@ -10,11 +10,7 @@ function getInputValue(selector: string) {
 export function renderDevPage() {
   return `
     <div class="page" id="page-dev" data-page="dev">
-      <div class="app-header" data-tauri-drag-region>
-        <button class="nav-back" data-tauri-drag-region="false">뒤로</button>
-        <div class="app-title" data-tauri-drag-region="false">개발자 메뉴</div>
-        <div class="header-spacer"></div>
-      </div>
+      ${renderHeader({ title: "개발자 메뉴", showBack: true })}
       <main class="layout">
         <section>
           <h2>GAIA 커맨드 전송</h2>
@@ -67,3 +63,4 @@ export function bindDevPage(handlers: DevPageHandlers) {
     );
   });
 }
+import { renderHeader } from "./components/header";

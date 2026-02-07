@@ -1,11 +1,9 @@
+import { renderHeader } from "./components/header";
+
 export function renderSettingsPage() {
   return `
     <div class="page" id="page-settings" data-page="settings">
-      <div class="app-header" data-tauri-drag-region>
-        <button class="nav-back" data-tauri-drag-region="false">뒤로</button>
-        <div class="app-title" data-tauri-drag-region="false">설정</div>
-        <div class="header-spacer"></div>
-      </div>
+      ${renderHeader({ title: "설정", showBack: true })}
       <main class="layout">
         <section>
           <h2>STONE 정보</h2>

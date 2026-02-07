@@ -1,11 +1,9 @@
+import { renderHeader } from "./components/header";
+
 export function renderConnectPage() {
   return `
     <div class="page" id="page-connect" data-page="connect">
-      <header class="app-header" data-tauri-drag-region>
-        <button class="nav-back" data-tauri-drag-region="false">뒤로</button>
-        <div class="app-title" data-tauri-drag-region="false">연결</div>
-        <div class="header-spacer"></div>
-      </header>
+      ${renderHeader({ title: "연결", showBack: true })}
       <main class="layout">
         <section>
           <h2>기기 등록</h2>

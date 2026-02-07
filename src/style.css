@@ -1,4 +1,5 @@
 @import "pretendard/dist/web/static/pretendard.css";
+@import "./styles/header.css";
 
 :root {
   color-scheme: dark;
@@ -70,77 +71,6 @@ body {
   min-width: 0;
 }
 
-.app-header {
-  position: sticky;
-  top: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 48px 20px 20px 20px;
-  background: rgba(19, 19, 20, 0.75);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  z-index: 2;
-}
-
-.app-title {
-  font-weight: medium;
-  letter-spacing: 0.02em;
-  font-size: 20px;
-  flex: 1;
-}
-
-.nav-back {
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 12px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.page[data-page="home"] .nav-back {
-  display: none;
-}
-
-.page[data-page="dev"] .nav-back,
-.page[data-page="settings"] .nav-back {
-  display: inline-flex;
-}
-
-.nav-info,
-.nav-connect {
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 12px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.page[data-page="home"] .nav-info,
-.page[data-page="home"] .nav-connect {
-  display: inline-flex;
-}
-
-.page[data-page="dev"] .nav-info,
-.page[data-page="settings"] .nav-info,
-.page[data-page="connect"] .nav-info,
-.page[data-page="dev"] .nav-connect,
-.page[data-page="settings"] .nav-connect,
-.page[data-page="connect"] .nav-connect {
-  display: none;
-}
-
-.header-spacer {
-  width: 44px;
-  height: 1px;
-  pointer-events: none;
-}
 
 .status {
   color: var(--muted);
@@ -335,14 +265,14 @@ button#disconnect {
 }
 
 .list-label {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 400;
   color: var(--ink);
   margin-bottom: 8px;
 }
 
 .list-value {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 400;
   color: var(--muted);
 }
