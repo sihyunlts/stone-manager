@@ -5,7 +5,7 @@
   justify-content: center;
   position: relative;
   transition: background-color 0.1s ease;
-  gap: 8px;
+  gap: 4px;
 
   &:not(:last-child)::after {
     content: "";
@@ -19,7 +19,7 @@
 
   .list-label {
     font-size: 17px;
-    font-weight: 400;
+    font-weight: 500;
     color: var(--ink);
   }
 
