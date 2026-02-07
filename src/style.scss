@@ -1,9 +1,63 @@
-@use "pretendard/dist/web/static/pretendard.css";
 @use "styles/header";
 @use "styles/range";
 @use "styles/toggle";
 @use "styles/list";
 @use "styles/section";
+
+@font-face {
+  font-family: "Pretendard +100";
+  src: url("../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2") format("woff2-variations");
+  font-weight: 100;
+  font-variation-settings: "wght" 200;
+}
+@font-face {
+  font-family: "Pretendard +100";
+  src: url("../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2") format("woff2-variations");
+  font-weight: 200;
+  font-variation-settings: "wght" 300;
+}
+@font-face {
+  font-family: "Pretendard +100";
+  src: url("../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2") format("woff2-variations");
+  font-weight: 300;
+  font-variation-settings: "wght" 400;
+}
+@font-face {
+  font-family: "Pretendard +100";
+  src: url("../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2") format("woff2-variations");
+  font-weight: 400;
+  font-variation-settings: "wght" 500;
+}
+@font-face {
+  font-family: "Pretendard +100";
+  src: url("../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2") format("woff2-variations");
+  font-weight: 500;
+  font-variation-settings: "wght" 600;
+}
+@font-face {
+  font-family: "Pretendard +100";
+  src: url("../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2") format("woff2-variations");
+  font-weight: 600;
+  font-variation-settings: "wght" 700;
+}
+@font-face {
+  font-family: "Pretendard +100";
+  src: url("../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2") format("woff2-variations");
+  font-weight: 700;
+  font-variation-settings: "wght" 800;
+}
+@font-face {
+  font-family: "Pretendard +100";
+  src: url("../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2") format("woff2-variations");
+  font-weight: 800;
+  font-variation-settings: "wght" 900;
+}
+@font-face {
+  font-family: "Pretendard +100";
+  src: url("../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2") format("woff2-variations");
+  font-weight: 900;
+  font-variation-settings: "wght" 999;
+}
 
 @font-face {
   font-family: "Geist Sans";
@@ -30,7 +84,7 @@
   --muted: #b2b2b2;
   --log-in: #73b9d7;
   --log-out: #df72a0;
-  font-family: "Geist Sans", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+  font-family: "Geist Sans", "Pretendard +100", "Pretendard Variable", -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
 }
 
 * {
