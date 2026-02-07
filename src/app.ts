@@ -4,6 +4,7 @@ import { listen, type Event } from "@tauri-apps/api/event";
 import { bindDevPage, renderDevPage } from "./dev";
 import { renderSettingsPage } from "./settings";
 import { renderConnectPage } from "./connect";
+import { renderLicensesPage } from "./licenses";
 import { renderHeader } from "./components/header";
 import { renderRange, updateRangeFill } from "./components/range";
 import { renderToggle } from "./components/toggle";
@@ -142,6 +143,7 @@ export function initApp() {
         ${renderConnectPage()}
         ${renderSettingsPage()}
         ${renderDevPage()}
+        ${renderLicensesPage()}
       </div>
     </div>
   `;
@@ -155,6 +157,7 @@ export function initApp() {
   const pageDev = el<HTMLDivElement>("#page-dev");
   const pageSettings = el<HTMLDivElement>("#page-settings");
   const pageConnect = el<HTMLDivElement>("#page-connect");
+  const pageLicenses = el<HTMLDivElement>("#page-licenses");
   const status = el<HTMLDivElement>("#status");
   const battery = el<HTMLDivElement>("#battery");
   const volumeSlider = el<HTMLInputElement>("#volumeSlider");
@@ -186,9 +189,9 @@ export function initApp() {
   let devClicks = 0;
   let devClickTimer: ReturnType<typeof setTimeout> | null = null;
 
-  let currentPage: "home" | "dev" | "settings" | "connect" = "home";
+  let currentPage: "home" | "dev" | "settings" | "connect" | "licenses" = "home";
   let isTransitioning = false;
-  const pageHistory: Array<"home" | "dev" | "settings" | "connect"> = [];
+  const pageHistory: Array<"home" | "dev" | "settings" | "connect" | "licenses"> = [];
 
   pageHome.style.filter = "brightness(1)";
   pageDev.style.zIndex = "0";
@@ -197,15 +200,17 @@ export function initApp() {
   animate(pageDev, { x: "100%" }, { duration: 0 });
   animate(pageSettings, { x: "100%" }, { duration: 0 });
   animate(pageConnect, { x: "100%" }, { duration: 0 });
+  animate(pageLicenses, { x: "100%" }, { duration: 0 });
   function resetPageStack() {
     pageHome.style.zIndex = "0";
     pageDev.style.zIndex = "0";
     pageSettings.style.zIndex = "0";
     pageConnect.style.zIndex = "0";
+    pageLicenses.style.zIndex = "0";
   }
 
   async function navigate(
-    to: "home" | "dev" | "settings" | "connect",
+    to: "home" | "dev" | "settings" | "connect" | "licenses",
     direction: "forward" | "back"
   ) {
     if (isTransitioning || to === currentPage) return;
@@ -218,7 +223,9 @@ export function initApp() {
           ? pageSettings
           : to === "connect"
             ? pageConnect
-            : pageHome;
+            : to === "licenses"
+              ? pageLicenses
+              : pageHome;
     const leave =
       currentPage === "dev"
         ? pageDev
@@ -226,7 +233,9 @@ export function initApp() {
           ? pageSettings
           : currentPage === "connect"
             ? pageConnect
-            : pageHome;
+            : currentPage === "licenses"
+              ? pageLicenses
+              : pageHome;
     resetPageStack();
     if (direction === "forward") {
       bring.style.zIndex = "2";
@@ -264,7 +273,7 @@ export function initApp() {
     isTransitioning = false;
   }
 
-  function goTo(to: "home" | "dev" | "settings" | "connect") {
+  function goTo(to: "home" | "dev" | "settings" | "connect" | "licenses") {
     if (isTransitioning || to === currentPage) return;
     pageHistory.push(currentPage);
     void navigate(to, "forward");
@@ -873,6 +882,23 @@ export function initApp() {
   });
   navConnect.addEventListener("click", () => {
     goTo("connect");
+  });
+  const navLicenses = el<HTMLDivElement>("#navLicenses");
+  if (navLicenses) {
+    navLicenses.addEventListener("click", () => {
+      goTo("licenses");
+    });
+  }
+
+  document.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
+    const item = target.closest("[data-url]") as HTMLElement;
+    if (item) {
+      const url = item.dataset.url;
+      if (url) {
+        invoke("open_url", { url }).catch((err) => logLine(String(err), "SYS"));
+      }
+    }
   });
   navBackButtons.forEach((btn) => {
     btn.addEventListener("click", () => {

@@ -40,3 +40,12 @@
     margin-bottom: 0;
   }
 }
+
+.list-item.clickable {
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+
+  &:active {
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+}

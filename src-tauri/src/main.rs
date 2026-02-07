@@ -440,6 +440,14 @@ fn log_line(line: String, tone: String, _ts: String) {
 }
 
 #[tauri::command]
+fn open_url(url: String) {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open").arg(url).spawn();
+    }
+}
+
+#[tauri::command]
 fn set_tray_battery(percent: Option<u8>, charging: bool, full: bool) {
     let Some(tray) = TRAY.get() else { return; };
     let title = percent.map(|p| format!("{p}%")).unwrap_or_default();
@@ -539,7 +547,8 @@ fn main() {
             disconnect_device,
             send_gaia_command,
             log_line,
-            set_tray_battery
+            set_tray_battery,
+            open_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

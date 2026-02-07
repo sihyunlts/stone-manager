@@ -20,6 +20,11 @@ export function renderSettingsPage() {
         valueId: "settingsAppVersion",
         id: "settingsAppVersionRow",
       }),
+      renderListItem({
+        label: "오픈소스 라이선스",
+        id: "navLicenses",
+        clickable: true,
+      }),
     ]),
   });
 

@@ -5,6 +5,8 @@ type ListItemOptions = {
   right?: string;
   className?: string;
   id?: string;
+  clickable?: boolean;
+  data?: { [key: string]: string };
 };
 
 export function renderList(items: string[]) {
@@ -12,11 +14,16 @@ export function renderList(items: string[]) {
 }
 
 export function renderListItem(options: ListItemOptions) {
-  const { label, value, valueId, right, className, id } = options;
-  const classes = ["list-item", right ? "list-item--row" : "", className]
+  const { label, value, valueId, right, className, id, clickable, data } = options;
+  const classes = ["list-item", right ? "list-item--row" : "", clickable ? "clickable" : "", className]
     .filter(Boolean)
     .join(" ");
   const idAttr = id ? ` id="${id}"` : "";
+  const dataAttrs = data
+    ? Object.entries(data)
+        .map(([key, val]) => ` data-${key}="${val}"`)
+        .join("")
+    : "";
   const valueContent = value ?? "--";
   const valueMarkup =
     valueId !== undefined
@@ -26,14 +33,14 @@ export function renderListItem(options: ListItemOptions) {
         : "";
   if (right) {
     return `
-      <div class="${classes}"${idAttr}>
+      <div class="${classes}"${idAttr}${dataAttrs}>
         <div class="list-label">${label}</div>
         ${right}
       </div>
     `;
   }
   return `
-    <div class="${classes}"${idAttr}>
+    <div class="${classes}"${idAttr}${dataAttrs}>
       <div class="list-label">${label}</div>
       ${valueMarkup}
     </div>
