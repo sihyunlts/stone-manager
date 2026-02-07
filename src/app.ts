@@ -261,7 +261,7 @@ export function initApp() {
     isTransitioning = false;
   }
 
-  function goTo(to: "home" | "dev" | "settings") {
+  function goTo(to: "home" | "dev" | "settings" | "connect") {
     if (isTransitioning || to === currentPage) return;
     pageHistory.push(currentPage);
     void navigate(to, "forward");
