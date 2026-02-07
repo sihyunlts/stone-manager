@@ -27,7 +27,7 @@ export function renderSettingsPage() {
         <section>
           <h2>앱 정보</h2>
           <div class="card list-group">
-            <div class="list-item">
+            <div class="list-item" id="settingsAppVersionRow">
               <div class="list-label">버전</div>
               <div class="list-value" id="settingsAppVersion">--</div>
             </div>

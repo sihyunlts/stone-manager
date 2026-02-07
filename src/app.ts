@@ -204,23 +204,28 @@ export function initApp() {
 
   let currentPage: "home" | "dev" | "settings" = "home";
   let isTransitioning = false;
+  const pageHistory: Array<"home" | "dev" | "settings"> = [];
 
-  pageHome.style.transform = "translateX(0)";
   pageHome.style.filter = "brightness(1)";
-  pageDev.style.transform = "translateX(100%)";
-  pageSettings.style.transform = "translateX(100%)";
   pageDev.style.zIndex = "0";
   pageHome.style.zIndex = "1";
   animate(pageHome, { x: "0%" }, { duration: 0 });
   animate(pageDev, { x: "100%" }, { duration: 0 });
   animate(pageSettings, { x: "100%" }, { duration: 0 });
-  async function navigate(to: "home" | "dev" | "settings") {
+  function resetPageStack() {
+    pageHome.style.zIndex = "0";
+    pageDev.style.zIndex = "0";
+    pageSettings.style.zIndex = "0";
+  }
+
+  async function navigate(to: "home" | "dev" | "settings", direction: "forward" | "back") {
     if (isTransitioning || to === currentPage) return;
     isTransitioning = true;
     pageHost.style.pointerEvents = "none";
     const bring = to === "dev" ? pageDev : to === "settings" ? pageSettings : pageHome;
     const leave = currentPage === "dev" ? pageDev : currentPage === "settings" ? pageSettings : pageHome;
-    if (to !== "home") {
+    resetPageStack();
+    if (direction === "forward") {
       bring.style.zIndex = "2";
       leave.style.zIndex = "1";
       const springConfig = {
@@ -231,12 +236,8 @@ export function initApp() {
 
       await Promise.all([
         animate(bring, { x: ["100%", "0%"] }, springConfig).finished,
-        animate(pageHome, { x: ["0%", "-20%"] }, springConfig).finished,
+        animate(leave, { x: ["0%", "-20%"] }, springConfig).finished,
       ]);
-      currentPage = to;
-      if (to === "dev" || to === "settings") {
-        requestAllDeviceInfo();
-      }
     } else {
       bring.style.zIndex = "1";
       leave.style.zIndex = "2";
@@ -248,13 +249,28 @@ export function initApp() {
 
       await Promise.all([
         animate(leave, { x: ["0%", "100%"] }, springConfig).finished,
-        animate(pageHome, { x: ["-20%", "0%"] }, springConfig).finished,
+        animate(bring, { x: ["-20%", "0%"] }, springConfig).finished,
       ]);
-      currentPage = "home";
       leave.style.zIndex = "0";
+    }
+    currentPage = to;
+    if (to === "dev" || to === "settings") {
+      requestAllDeviceInfo();
     }
     pageHost.style.pointerEvents = "";
     isTransitioning = false;
+  }
+
+  function goTo(to: "home" | "dev" | "settings") {
+    if (isTransitioning || to === currentPage) return;
+    pageHistory.push(currentPage);
+    void navigate(to, "forward");
+  }
+
+  function goBack() {
+    if (isTransitioning) return;
+    const target = pageHistory.pop();
+    void navigate(target ?? "home", "back");
   }
 
   function logLine(line: string, tone: "IN" | "OUT" | "SYS" = "SYS") {
@@ -273,7 +289,7 @@ export function initApp() {
       devClicks = 0;
       devEnabled = true;
       logLine("Developer menu unlocked", "SYS");
-      navigate("dev");
+      goTo("dev");
     }
   }
 
@@ -733,6 +749,7 @@ export function initApp() {
   const infoRssi = document.querySelector<HTMLDivElement>("#settingsRssi");
   const infoWheel = document.querySelector<HTMLDivElement>("#settingsWheel");
   const settingsAppVersion = document.querySelector<HTMLDivElement>("#settingsAppVersion");
+  const settingsAppVersionRow = document.querySelector<HTMLDivElement>("#settingsAppVersionRow");
 
   function setDevInfo(target: HTMLDivElement | null, value: string) {
     if (target) target.textContent = value;
@@ -842,13 +859,15 @@ export function initApp() {
     }
   });
   registerButton.addEventListener("click", registerDevice);
-  appTitle.addEventListener("click", onDevClick);
+  if (settingsAppVersionRow) {
+    settingsAppVersionRow.addEventListener("click", onDevClick);
+  }
   navSettings.addEventListener("click", () => {
-    navigate("settings");
+    goTo("settings");
   });
   navBackButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
-      navigate("home");
+      goBack();
     });
   });
   removeButton.addEventListener("click", () => {
