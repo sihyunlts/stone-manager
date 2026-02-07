@@ -3,6 +3,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { listen, type Event } from "@tauri-apps/api/event";
 import { bindDevPage, renderDevPage } from "./dev";
 import { renderSettingsPage } from "./settings";
+import { renderConnectPage } from "./connect";
 import { animate } from "motion";
 import stoneImg from "./assets/stone.png";
 
@@ -83,6 +84,7 @@ export function initApp() {
           <header class="app-header" data-tauri-drag-region>
             <button class="nav-back" data-tauri-drag-region="false">뒤로</button>
             <div class="app-title" id="appTitle" data-tauri-drag-region="false">STONE 매니저</div>
+            <button class="nav-connect" id="navConnect" data-tauri-drag-region="false">연결</button>
             <button class="nav-info" id="navSettings" data-tauri-drag-region="false">설정</button>
           </header>
           <main class="layout">
@@ -132,30 +134,9 @@ export function initApp() {
               </div>
             </section>
 
-            <section>
-              <h2>기기 등록</h2>
-              <div class="card">
-                <div class="row">
-                  <select id="registerList"></select>
-                  <button id="registerDevice">등록</button>
-                </div>
-              </div>
-            </section>
-
-            <section>
-              <h2>연결</h2>
-              <div class="card">
-                <div class="row">
-                  <button id="refreshDevices">새로고침</button>
-                  <select id="registeredList"></select>
-                  <button id="connect">연결</button>
-                  <button id="disconnect">연결 끊기</button>
-                  <button id="removeRegistered">삭제</button>
-                </div>
-              </div>
-            </section>
           </main>
         </div>
+        ${renderConnectPage()}
         ${renderSettingsPage()}
         ${renderDevPage()}
       </div>
@@ -164,11 +145,13 @@ export function initApp() {
 
   const appTitle = el<HTMLDivElement>("#appTitle");
   const navBackButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-back"));
+  const navConnect = el<HTMLButtonElement>("#navConnect");
   const navSettings = el<HTMLButtonElement>("#navSettings");
   const pageHost = el<HTMLDivElement>("#pageHost");
   const pageHome = el<HTMLDivElement>("#page-home");
   const pageDev = el<HTMLDivElement>("#page-dev");
   const pageSettings = el<HTMLDivElement>("#page-settings");
+  const pageConnect = el<HTMLDivElement>("#page-connect");
   const status = el<HTMLDivElement>("#status");
   const battery = el<HTMLDivElement>("#battery");
   const volumeSlider = el<HTMLInputElement>("#volumeSlider");
@@ -202,9 +185,9 @@ export function initApp() {
   let devClicks = 0;
   let devClickTimer: ReturnType<typeof setTimeout> | null = null;
 
-  let currentPage: "home" | "dev" | "settings" = "home";
+  let currentPage: "home" | "dev" | "settings" | "connect" = "home";
   let isTransitioning = false;
-  const pageHistory: Array<"home" | "dev" | "settings"> = [];
+  const pageHistory: Array<"home" | "dev" | "settings" | "connect"> = [];
 
   pageHome.style.filter = "brightness(1)";
   pageDev.style.zIndex = "0";
@@ -212,18 +195,37 @@ export function initApp() {
   animate(pageHome, { x: "0%" }, { duration: 0 });
   animate(pageDev, { x: "100%" }, { duration: 0 });
   animate(pageSettings, { x: "100%" }, { duration: 0 });
+  animate(pageConnect, { x: "100%" }, { duration: 0 });
   function resetPageStack() {
     pageHome.style.zIndex = "0";
     pageDev.style.zIndex = "0";
     pageSettings.style.zIndex = "0";
+    pageConnect.style.zIndex = "0";
   }
 
-  async function navigate(to: "home" | "dev" | "settings", direction: "forward" | "back") {
+  async function navigate(
+    to: "home" | "dev" | "settings" | "connect",
+    direction: "forward" | "back"
+  ) {
     if (isTransitioning || to === currentPage) return;
     isTransitioning = true;
     pageHost.style.pointerEvents = "none";
-    const bring = to === "dev" ? pageDev : to === "settings" ? pageSettings : pageHome;
-    const leave = currentPage === "dev" ? pageDev : currentPage === "settings" ? pageSettings : pageHome;
+    const bring =
+      to === "dev"
+        ? pageDev
+        : to === "settings"
+          ? pageSettings
+          : to === "connect"
+            ? pageConnect
+            : pageHome;
+    const leave =
+      currentPage === "dev"
+        ? pageDev
+        : currentPage === "settings"
+          ? pageSettings
+          : currentPage === "connect"
+            ? pageConnect
+            : pageHome;
     resetPageStack();
     if (direction === "forward") {
       bring.style.zIndex = "2";
@@ -864,6 +866,9 @@ export function initApp() {
   }
   navSettings.addEventListener("click", () => {
     goTo("settings");
+  });
+  navConnect.addEventListener("click", () => {
+    goTo("connect");
   });
   navBackButtons.forEach((btn) => {
     btn.addEventListener("click", () => {

@@ -110,7 +110,8 @@ body {
   display: inline-flex;
 }
 
-.nav-info {
+.nav-info,
+.nav-connect {
   padding: 6px 10px;
   border-radius: 999px;
   background: transparent;
@@ -121,12 +122,17 @@ body {
   white-space: nowrap;
 }
 
-.page[data-page="home"] .nav-info {
+.page[data-page="home"] .nav-info,
+.page[data-page="home"] .nav-connect {
   display: inline-flex;
 }
 
 .page[data-page="dev"] .nav-info,
-.page[data-page="settings"] .nav-info {
+.page[data-page="settings"] .nav-info,
+.page[data-page="connect"] .nav-info,
+.page[data-page="dev"] .nav-connect,
+.page[data-page="settings"] .nav-connect,
+.page[data-page="connect"] .nav-connect {
   display: none;
 }
 
