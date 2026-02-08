@@ -93,8 +93,12 @@ export function initApp() {
             titleId: "appTitle",
             showBack: false,
             right: `
-              <button class="nav-connect" id="navConnect" data-tauri-drag-region="false">연결</button>
-              <button class="nav-info" id="navSettings" data-tauri-drag-region="false">설정</button>
+              <button class="nav-connect" id="navConnect" data-tauri-drag-region="false">
+                <span class="material-symbols-rounded">bluetooth</span>
+              </button>
+              <button class="nav-info" id="navSettings" data-tauri-drag-region="false">
+                <span class="material-symbols-rounded">settings</span>
+              </button>
             `,
           })}
           <main class="layout">

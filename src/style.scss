@@ -5,6 +5,14 @@
 @use "styles/section";
 @use "styles/select";
 
+$material-symbols-font-path: "../node_modules/material-symbols/";
+@import "material-symbols/rounded.scss";
+
+.material-symbols-rounded {
+  font-size: 28px;
+  font-weight: 300;
+}
+
 @font-face {
   font-family: "Pretendard +100";
   src: local("※"), url("../node_modules/pretendard/dist/web/static/woff2/Pretendard-ExtraLight.woff2") format("woff2");

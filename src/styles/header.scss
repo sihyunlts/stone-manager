@@ -1,14 +1,26 @@
 .app-header {
   position: sticky;
   top: 0;
-  height: 80px;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 28px 20px 0 20px;
+  flex-direction: column;
+  padding: 0 20px;
   background: rgba(19, 19, 20, 0.85);
   backdrop-filter: blur(12px);
   z-index: 2;
+
+  &::before {
+    content: "";
+    display: block;
+    height: 32px;
+  }
+
+  .header-content {
+    height: 64px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
 
   .app-title {
     font-weight: 500;
@@ -19,6 +31,7 @@
   .header-left {
     display: flex;
     align-items: center;
+    margin-left: -4px;
   }
 
   .header-right {
@@ -26,17 +39,29 @@
     align-items: center;
     gap: 8px;
     justify-content: flex-end;
+    margin-right: -4px;
   }
 }
 
 .nav-back,
 .nav-info,
 .nav-connect {
-  padding: 8px 10px;
+  width: 44px;
+  height: 44px;
   border-radius: 8px;
   background: transparent;
-  border: 1px solid var(--border);
   color: var(--muted);
-  font-size: 14px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.1s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  &:active {
+    background: rgba(255, 255, 255, 0.1);
+  }
 }
