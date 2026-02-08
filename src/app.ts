@@ -10,7 +10,7 @@ import { renderRange, updateRangeFill } from "./components/range";
 import { renderToggle } from "./components/toggle";
 import { renderListItem, renderList } from "./components/list";
 import { renderSection } from "./components/section";
-import { renderSelect } from "./components/select";
+import { bindSelect, renderSelect } from "./components/select";
 import { animate } from "motion";
 import stoneImg from "./assets/stone.png";
 
@@ -130,12 +130,13 @@ export function initApp() {
                     body: renderRange({ id: "lampBrightness", min: 0, max: 100, step: 0.1, value: 0, className: "thumb-vertical" }),
                   }),
                   renderListItem({
-                    label: "조명 종류",
+                    label: "조명 색상",
                     right: renderSelect({
                       id: "lampType",
                       value: 1,
+                      direction: "up",
                       options: [
-                        { value: 1, label: "단색" },
+                        { value: 1, label: "단일 색상" },
                         { value: 2, label: "촛불" },
                         { value: 3, label: "오로라" },
                         { value: 4, label: "파도" },
@@ -173,10 +174,9 @@ export function initApp() {
   const volumeSlider = el<HTMLInputElement>("#volumeSlider");
   const lampToggle = el<HTMLInputElement>("#lampToggle");
   const lampBrightness = el<HTMLInputElement>("#lampBrightness");
-  const lampType = el<HTMLSelectElement>("#lampType");
   const lampHue = el<HTMLInputElement>("#lampHue");
-  const registerList = el<HTMLSelectElement>("#registerList");
-  const registeredList = el<HTMLSelectElement>("#registeredList");
+  let registerSelected = "";
+  let registeredSelected = "";
   const registerButton = el<HTMLButtonElement>("#registerDevice");
   const removeButton = el<HTMLButtonElement>("#removeRegistered");
   let devices: DeviceInfo[] = [];
@@ -351,10 +351,29 @@ export function initApp() {
     void invoke("set_tray_battery", { percent: null, charging: false, full: false });
   }
 
+  const lampTypeSelect = bindSelect("lampType", (value) => {
+    const next = Number(value);
+    lampTypeState = next;
+    if (!lampOnState) return;
+    setLampType(next).catch((err) => logLine(String(err), "SYS"));
+    if (next === 1) {
+      setLampColor(lampHueState).catch((err) => logLine(String(err), "SYS"));
+    }
+  });
+
+  const registerListSelect = bindSelect("registerList", (value) => {
+    registerSelected = value;
+  });
+
+  const registeredListSelect = bindSelect("registeredList", (value) => {
+    registeredSelected = value;
+  });
+
   function setLampEnabled(enabled: boolean) {
-    [lampToggle, lampBrightness, lampType, lampHue].forEach((input) => {
-      input.disabled = !enabled;
-    });
+    lampToggle.disabled = !enabled;
+    lampBrightness.disabled = !enabled;
+    lampHue.disabled = !enabled;
+    lampTypeSelect?.setEnabled(enabled);
   }
 
   function updateLampUI() {
@@ -365,7 +384,7 @@ export function initApp() {
     }
     updateRangeFill(lampBrightness);
     lampToggle.checked = lampOnState;
-    lampType.value = String(lampTypeState);
+    lampTypeSelect?.setValue(lampTypeState);
     lampHue.value = String(lampHueState);
     updateRangeFill(lampHue);
     setLampEnabled(connectionState === "connected");
@@ -524,73 +543,69 @@ export function initApp() {
   }
 
   function renderRegisterList() {
-    const previous = registerList.value;
-    registerList.innerHTML = "";
+    const previous = registerSelected;
     const connectedDevices = devices.filter((d) => d.connected);
     if (connectedDevices.length === 0) {
-      const opt = document.createElement("option");
-      opt.value = "";
-      opt.textContent = "연결된 기기가 없습니다.";
-      opt.disabled = true;
-      opt.selected = true;
-      registerList.appendChild(opt);
+      registerSelected = "";
+      registerListSelect?.setOptions([{ value: "", label: "연결된 기기가 없습니다." }], "");
+      registerListSelect?.setEnabled(false);
       return;
     }
 
-    for (const device of connectedDevices) {
-      const opt = document.createElement("option");
-      opt.value = device.address;
+    registerListSelect?.setEnabled(true);
+    const options = connectedDevices.map((device) => {
       const alias = device.alias ?? "";
       const raw = device.raw_name ?? "";
-      const label =
-        alias && raw && alias !== raw
-          ? `${alias} (name: ${raw})`
-          : device.name;
-      opt.textContent = `${label} (${device.address})`;
-      registerList.appendChild(opt);
-    }
-
+      const label = alias && raw && alias !== raw ? `${alias} (name: ${raw})` : device.name;
+      return { value: device.address, label: `${label} (${device.address})` };
+    });
     if (previous && connectedDevices.some((d) => d.address === previous)) {
-      registerList.value = previous;
+      registerSelected = previous;
+      registerListSelect?.setOptions(options, previous);
       return;
     }
     const preferred = connectedDevices.find((d) => d.name.toUpperCase().includes("STONE"));
     if (preferred) {
-      registerList.value = preferred.address;
-    } else if (connectedDevices[0]) {
-      registerList.value = connectedDevices[0].address;
+      registerSelected = preferred.address;
+      registerListSelect?.setOptions(options, preferred.address);
+      return;
+    }
+    if (connectedDevices[0]) {
+      registerSelected = connectedDevices[0].address;
+      registerListSelect?.setOptions(options, connectedDevices[0].address);
     }
   }
 
   function renderRegisteredList() {
-    const previous = registeredList.value;
-    registeredList.innerHTML = "";
+    const previous = registeredSelected;
     if (pairedDevices.length === 0) {
-      const opt = document.createElement("option");
-      opt.value = "";
-      opt.textContent = "등록된 기기가 없습니다.";
-      opt.disabled = true;
-      opt.selected = true;
-      registeredList.appendChild(opt);
+      registeredSelected = "";
+      registeredListSelect?.setOptions([{ value: "", label: "등록된 기기가 없습니다." }], "");
+      registeredListSelect?.setEnabled(false);
       return;
     }
 
-    for (const paired of pairedDevices) {
+    registeredListSelect?.setEnabled(true);
+    const options = pairedDevices.map((paired) => {
       const device = devices.find((d) => d.address === paired.address);
       const status = device?.connected ? "connected" : device ? "paired" : "saved";
       const name = device?.name ?? paired.name ?? paired.address;
-      const opt = document.createElement("option");
-      opt.value = paired.address;
-      opt.textContent = `${name} (${paired.address}) · ${status}`;
-      registeredList.appendChild(opt);
-    }
+      return { value: paired.address, label: `${name} (${paired.address}) · ${status}` };
+    });
 
     if (previous && pairedDevices.some((d) => d.address === previous)) {
-      registeredList.value = previous;
+      registeredSelected = previous;
+      registeredListSelect?.setOptions(options, previous);
       return;
     }
     if (connectedAddress && pairedDevices.some((d) => d.address === connectedAddress)) {
-      registeredList.value = connectedAddress;
+      registeredSelected = connectedAddress;
+      registeredListSelect?.setOptions(options, connectedAddress);
+      return;
+    }
+    if (pairedDevices[0]) {
+      registeredSelected = pairedDevices[0].address;
+      registeredListSelect?.setOptions(options, pairedDevices[0].address);
     }
   }
 
@@ -622,7 +637,7 @@ export function initApp() {
   }
 
   async function connect() {
-    const address = registeredList.value;
+    const address = registeredSelected;
     if (!address) {
       logLine("Select a device first", "SYS");
       return;
@@ -645,7 +660,7 @@ export function initApp() {
   }
 
   async function registerDevice() {
-    const address = registerList.value;
+    const address = registerSelected;
     if (!address) {
       logLine("Select a device to register", "SYS");
       return;
@@ -866,16 +881,6 @@ export function initApp() {
     }, 150);
     updateRangeFill(lampBrightness);
   });
-  lampType.addEventListener("change", () => {
-    if (lampType.disabled) return;
-    const value = Number(lampType.value);
-    lampTypeState = value;
-    if (!lampOnState) return;
-    setLampType(value).catch((err) => logLine(String(err), "SYS"));
-    if (value === 1) {
-      setLampColor(lampHueState).catch((err) => logLine(String(err), "SYS"));
-    }
-  });
   lampHue.addEventListener("input", () => {
     if (lampHue.disabled) return;
     lampHueState = Number(lampHue.value);
@@ -919,7 +924,7 @@ export function initApp() {
     });
   });
   removeButton.addEventListener("click", () => {
-    const address = registeredList.value;
+    const address = registeredSelected;
     if (!address) {
       logLine("Select a device to remove", "SYS");
       return;

@@ -178,6 +178,10 @@ body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+
+    &:has(.select.is-open) {
+      overflow: visible;
+    }
   }
 }
 
