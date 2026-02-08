@@ -50,31 +50,31 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
 
   function setValue(value: string | number, emit = false) {
     const nextValue = String(value);
-    root.dataset.value = nextValue;
+    root!.dataset.value = nextValue;
     const option = options.find((item) => item.dataset.value === nextValue);
     if (option) {
-      trigger.textContent = option.textContent ?? "";
+      trigger!.textContent = option.textContent ?? "";
       options.forEach((item) => item.classList.toggle("is-selected", item === option));
     }
     if (emit) onChange(nextValue);
   }
 
   function setEnabled(enabled: boolean) {
-    root.classList.toggle("is-disabled", !enabled);
-    trigger.disabled = !enabled;
+    root!.classList.toggle("is-disabled", !enabled);
+    trigger!.disabled = !enabled;
   }
 
   function bindOptions() {
-    options = Array.from(root.querySelectorAll<HTMLDivElement>(".select-option"));
+    options = Array.from(root!.querySelectorAll<HTMLDivElement>(".select-option"));
     options.forEach((option) => {
       option.addEventListener("click", (event) => {
         event.stopPropagation();
-        if (root.classList.contains("is-disabled")) return;
+        if (root!.classList.contains("is-disabled")) return;
         const value = option.dataset.value;
         if (!value) return;
         setValue(value, true);
-        root.classList.remove("is-open");
-        trigger.setAttribute("aria-expanded", "false");
+        root!.classList.remove("is-open");
+        trigger!.setAttribute("aria-expanded", "false");
       });
     });
   }
@@ -87,7 +87,7 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
         return `<div class="select-option${selected}" data-value="${item.value}">${item.label}</div>`;
       })
       .join("");
-    menu.innerHTML = optionsMarkup;
+    menu!.innerHTML = optionsMarkup;
     bindOptions();
     setValue(currentValue, emit);
   }
