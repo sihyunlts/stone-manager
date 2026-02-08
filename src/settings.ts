@@ -14,8 +14,7 @@ export function renderSettingsPage() {
       ${renderList([
         renderListItem({
           label: "사용설명서",
-          clickable: true,
-          data: { url: "https://pfile.imholic.com:2822/Pantech/IM-100/IM-100S%20Manual%5B1%5D.pdf" },
+          link: { url: "https://pfile.imholic.com:2822/Pantech/IM-100/IM-100S%20Manual%5B1%5D.pdf" },
         }),
       ])}
     `,
@@ -32,13 +31,11 @@ export function renderSettingsPage() {
       renderListItem({
         label: "GitHub 저장소",
         value: "sihyunlts/stone-manager",
-        clickable: true,
-        data: { url: "https://github.com/sihyunlts/stone-manager" },
+        link: { url: "https://github.com/sihyunlts/stone-manager" },
       }),
       renderListItem({
         label: "오픈소스 라이선스",
         id: "navLicenses",
-        clickable: true,
       }),
     ]),
   });

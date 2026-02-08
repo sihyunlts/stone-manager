@@ -12,8 +12,7 @@ export function renderLicensesPage() {
     return renderListItem({
       label: lib.name,
       className: "license-item",
-      clickable: !!url,
-      data: url ? { url } : {}
+      link: url ? { url } : undefined
     });
   });
 

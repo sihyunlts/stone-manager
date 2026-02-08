@@ -117,28 +117,32 @@ export function initApp() {
               title: "램프",
               body: `
                 ${renderList([
-                  renderListItem({ label: "램프 사용", right: renderToggle({ id: "lampToggle" }) }),
+                  renderListItem({
+                    label: "램프 사용",
+                    right: renderToggle({ id: "lampToggle" }),
+                  }),
                 ])}
-                <div class="card">
-                  <label class="wide">
-                    조명 밝기
-                      ${renderRange({ id: "lampBrightness", min: 0, max: 100, step: 0.1, value: 0, className: "thumb-vertical" })}
-                  </label>
-                  <label>
-                    조명 종류
-                    <select id="lampType">
-                      <option value="1">단색</option>
-                      <option value="2">촛불</option>
-                      <option value="3">오로라</option>
-                      <option value="4">파도</option>
-                      <option value="5">반딧불</option>
-                    </select>
-                  </label>
-                  <label class="wide">
-                    색상
-                    ${renderRange({ id: "lampHue", min: 0, max: 360, step: 1, value: 0, className: "range-hue" })}
-                  </label>
-                </div>
+                ${renderList([
+                  renderListItem({
+                    label: "조명 밝기",
+                    col: true,
+                    body: renderRange({ id: "lampBrightness", min: 0, max: 100, step: 0.1, value: 0, className: "thumb-vertical" }),
+                  }),
+                  renderListItem({
+                    label: "조명 종류",
+                    right: `
+                      <select id="lampType">
+                        <option value="1">단색</option>
+                        <option value="2">촛불</option>
+                        <option value="3">오로라</option>
+                        <option value="4">파도</option>
+                        <option value="5">반딧불</option>
+                      </select>
+                    `,
+                    col: true,
+                    body: renderRange({ id: "lampHue", min: 0, max: 360, step: 1, value: 0, className: "range-hue" }),
+                  }),
+                ])}
               `,
             })}
 

@@ -30,15 +30,22 @@
   }
 }
 
-.list-item--row {
-  flex-direction: row;
+.list-item--col {
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.list-item-row {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  width: 100%;
+}
 
-  .list-label {
-    margin-bottom: 0;
-  }
+.list-body {
+  width: 100%;
+  display: flex;
 }
 
 .list-item.clickable {

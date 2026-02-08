@@ -3,10 +3,11 @@ type ListItemOptions = {
   value?: string;
   valueId?: string;
   right?: string;
+  body?: string;
+  col?: boolean;
   className?: string;
   id?: string;
-  clickable?: boolean;
-  data?: { [key: string]: string };
+  link?: { url: string };
 };
 
 export function renderList(items: string[]) {
@@ -14,16 +15,21 @@ export function renderList(items: string[]) {
 }
 
 export function renderListItem(options: ListItemOptions) {
-  const { label, value, valueId, right, className, id, clickable, data } = options;
-  const classes = ["list-item", right ? "list-item--row" : "", clickable ? "clickable" : "", className]
+  const { label, value, valueId, right, body, col, className, id, link } = options;
+  const isCol = Boolean(col || body);
+  const rowMarkup = right
+    ? `<div class="list-item-row"><div class="list-label">${label}</div>${right}</div>`
+    : `<div class="list-label">${label}</div>`;
+  const classes = [
+    "list-item",
+    isCol ? "list-item--col" : "",
+    link || id ? "clickable" : "",
+    className,
+  ]
     .filter(Boolean)
     .join(" ");
   const idAttr = id ? ` id="${id}"` : "";
-  const dataAttrs = data
-    ? Object.entries(data)
-        .map(([key, val]) => ` data-${key}="${val}"`)
-        .join("")
-    : "";
+  const dataAttrs = link ? ` data-url="${link.url}"` : "";
   const valueContent = value ?? "--";
   const valueMarkup =
     valueId !== undefined
@@ -31,18 +37,12 @@ export function renderListItem(options: ListItemOptions) {
       : value !== undefined
         ? `<div class="list-value">${valueContent}</div>`
         : "";
-  if (right) {
-    return `
-      <div class="${classes}"${idAttr}${dataAttrs}>
-        <div class="list-label">${label}</div>
-        ${right}
-      </div>
-    `;
-  }
+  const bodyMarkup = body ? `<div class="list-body">${body}</div>` : "";
   return `
     <div class="${classes}"${idAttr}${dataAttrs}>
-      <div class="list-label">${label}</div>
+      ${rowMarkup}
       ${valueMarkup}
+      ${bodyMarkup}
     </div>
   `;
 }
