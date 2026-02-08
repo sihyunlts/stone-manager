@@ -169,6 +169,7 @@ body {
 .card {
   background: var(--card);
   border-radius: 12px;
+  corner-shape: superellipse(1.2);
   padding: 20px;
 
   &.list-group {
