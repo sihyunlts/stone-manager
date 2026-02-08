@@ -5,12 +5,23 @@ type RangeOptions = {
   step: number;
   value: number;
   className?: string;
+  icon?: string;
 };
 
 export function renderRange(options: RangeOptions) {
-  const { id, min, max, step, value, className } = options;
+  const { id, min, max, step, value, className, icon } = options;
   const classes = ["range", className].filter(Boolean).join(" ");
-  return `<input id="${id}" class="${classes}" type="range" min="${min}" max="${max}" step="${step}" value="${value}" />`;
+  const inputHtml = `<input id="${id}" class="${classes}" type="range" min="${min}" max="${max}" step="${step}" value="${value}" />`;
+  
+  if (icon) {
+    return `
+      <div class="range-group">
+        <span class="material-symbols-rounded">${icon}</span>
+        ${inputHtml}
+      </div>
+    `;
+  }
+  return inputHtml;
 }
 
 export function updateRangeFill(input: HTMLInputElement) {

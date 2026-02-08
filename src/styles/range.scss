@@ -61,3 +61,14 @@
     border: 4px solid var(--ink);
   }
 }
+
+.range-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+
+  .material-symbols-rounded {
+    color: var(--muted);
+  }
+}

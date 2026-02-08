@@ -113,7 +113,7 @@ export function initApp() {
               body: `
                 <div class="card">
                   <div class="row volume-row">
-                    ${renderRange({ id: "volumeSlider", min: 0, max: 30, step: 0.1, value: 0 })}
+                    ${renderRange({ id: "volumeSlider", min: 0, max: 30, step: 0.1, value: 0, icon: "volume_up" })}
                   </div>
                 </div>
               `,
