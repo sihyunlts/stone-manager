@@ -8,7 +8,8 @@ import { renderLicensesPage } from "./licenses";
 import { renderHeader } from "./components/header";
 import { renderRange, updateRangeFill } from "./components/range";
 import { renderToggle } from "./components/toggle";
-import { renderListItem } from "./components/list";
+import { renderListItem, renderList } from "./components/list";
+import { renderSection } from "./components/section";
 import { animate } from "motion";
 import stoneImg from "./assets/stone.png";
 
@@ -102,41 +103,44 @@ export function initApp() {
               <span class="battery" id="battery">--</span>
             </section>
 
-            <section>
-              <h2>소리</h2>
-              <div class="card">
-                <div class="row volume-row">
-                  ${renderRange({ id: "volumeSlider", min: 0, max: 30, step: 0.1, value: 0 })}
+            ${renderSection({
+              title: "소리",
+              body: `
+                <div class="card">
+                  <div class="row volume-row">
+                    ${renderRange({ id: "volumeSlider", min: 0, max: 30, step: 0.1, value: 0 })}
+                  </div>
                 </div>
-              </div>
-            </section>
-
-            <section>
-              <h2>램프</h2>
-              <div class="card list-group">
-                ${renderListItem({ label: "램프 사용", right: renderToggle({ id: "lampToggle" }) })}
-              </div>
-              <div class="card">
-                <label class="wide">
-                  조명 밝기
-                    ${renderRange({ id: "lampBrightness", min: 0, max: 100, step: 0.1, value: 0, className: "thumb-vertical" })}
-                </label>
-                <label>
-                  조명 종류
-                  <select id="lampType">
-                    <option value="1">단색</option>
-                    <option value="2">촛불</option>
-                    <option value="3">오로라</option>
-                    <option value="4">파도</option>
-                    <option value="5">반딧불</option>
-                  </select>
-                </label>
-                <label>
-                  색상
-                  <input id="lampColor" type="color" value="#ffffff" />
-                </label>
-              </div>
-            </section>
+              `,
+            })}
+            ${renderSection({
+              title: "램프",
+              body: `
+                ${renderList([
+                  renderListItem({ label: "램프 사용", right: renderToggle({ id: "lampToggle" }) }),
+                ])}
+                <div class="card">
+                  <label class="wide">
+                    조명 밝기
+                      ${renderRange({ id: "lampBrightness", min: 0, max: 100, step: 0.1, value: 0, className: "thumb-vertical" })}
+                  </label>
+                  <label>
+                    조명 종류
+                    <select id="lampType">
+                      <option value="1">단색</option>
+                      <option value="2">촛불</option>
+                      <option value="3">오로라</option>
+                      <option value="4">파도</option>
+                      <option value="5">반딧불</option>
+                    </select>
+                  </label>
+                  <label>
+                    색상
+                    <input id="lampColor" type="color" value="#ffffff" />
+                  </label>
+                </div>
+              `,
+            })}
 
           </main>
         </div>
