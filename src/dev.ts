@@ -32,8 +32,6 @@ export function renderDevPage() {
           body: `<input id="payload" placeholder="e.g. 1E or 0A0B0C"/>`,
         }),
         renderListItem({
-          label: "전송",
-          col: true,
           body: `<button id="sendGaia">전송</button>`,
         }),
       ])}

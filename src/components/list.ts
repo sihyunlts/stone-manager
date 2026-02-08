@@ -1,5 +1,5 @@
 type ListItemOptions = {
-  label: string;
+  label?: string;
   value?: string;
   valueId?: string;
   right?: string;
@@ -17,9 +17,10 @@ export function renderList(items: string[]) {
 export function renderListItem(options: ListItemOptions) {
   const { label, value, valueId, right, body, col, className, id, link } = options;
   const isCol = Boolean(col || body);
+  const labelMarkup = label ? `<div class="list-label">${label}</div>` : "";
   const rowMarkup = right
-    ? `<div class="list-item-row"><div class="list-label">${label}</div>${right}</div>`
-    : `<div class="list-label">${label}</div>`;
+    ? `<div class="list-item-row">${labelMarkup}${right}</div>`
+    : labelMarkup;
   const classes = [
     "list-item",
     isCol ? "list-item--col" : "",
