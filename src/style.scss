@@ -3,6 +3,7 @@
 @use "styles/toggle";
 @use "styles/list";
 @use "styles/section";
+@use "styles/select";
 
 @font-face {
   font-family: "Pretendard +100";
@@ -196,7 +197,6 @@ body {
 }
 
 input,
-select,
 button {
   border: 1px solid var(--border);
   border-radius: 4px;

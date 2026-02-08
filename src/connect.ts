@@ -1,5 +1,6 @@
 import { renderHeader } from "./components/header";
 import { renderSection } from "./components/section";
+import { renderSelect } from "./components/select";
 
 export function renderConnectPage() {
   const registerSection = renderSection({
@@ -7,7 +8,7 @@ export function renderConnectPage() {
     body: `
       <div class="card">
         <div class="row">
-          <select id="registerList"></select>
+          ${renderSelect({ id: "registerList", options: [] })}
           <button id="registerDevice">등록</button>
         </div>
       </div>
@@ -20,7 +21,7 @@ export function renderConnectPage() {
       <div class="card">
         <div class="row">
           <button id="refreshDevices">새로고침</button>
-          <select id="registeredList"></select>
+          ${renderSelect({ id: "registeredList", options: [] })}
           <button id="connect">연결</button>
           <button id="disconnect">연결 끊기</button>
           <button id="removeRegistered">삭제</button>

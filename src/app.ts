@@ -10,6 +10,7 @@ import { renderRange, updateRangeFill } from "./components/range";
 import { renderToggle } from "./components/toggle";
 import { renderListItem, renderList } from "./components/list";
 import { renderSection } from "./components/section";
+import { renderSelect } from "./components/select";
 import { animate } from "motion";
 import stoneImg from "./assets/stone.png";
 
@@ -130,15 +131,17 @@ export function initApp() {
                   }),
                   renderListItem({
                     label: "조명 종류",
-                    right: `
-                      <select id="lampType">
-                        <option value="1">단색</option>
-                        <option value="2">촛불</option>
-                        <option value="3">오로라</option>
-                        <option value="4">파도</option>
-                        <option value="5">반딧불</option>
-                      </select>
-                    `,
+                    right: renderSelect({
+                      id: "lampType",
+                      value: 1,
+                      options: [
+                        { value: 1, label: "단색" },
+                        { value: 2, label: "촛불" },
+                        { value: 3, label: "오로라" },
+                        { value: 4, label: "파도" },
+                        { value: 5, label: "반딧불" },
+                      ],
+                    }),
                     col: true,
                     body: renderRange({ id: "lampHue", min: 0, max: 360, step: 1, value: 0, className: "range-hue" }),
                   }),
