@@ -53,3 +53,26 @@ export function renderSettingsPage() {
     </div>
   `;
 }
+
+export function bindSettingsPage(onUnlockDev: () => void) {
+  const row = document.querySelector<HTMLDivElement>("#settingsAppVersionRow");
+  if (!row) return;
+
+  let clicks = 0;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  row.addEventListener("click", () => {
+    clicks++;
+    if (timer) clearTimeout(timer);
+
+    timer = setTimeout(() => {
+      clicks = 0;
+    }, 300);
+
+    if (clicks >= 7) {
+      clicks = 0;
+      if (timer) clearTimeout(timer);
+      onUnlockDev();
+    }
+  });
+}

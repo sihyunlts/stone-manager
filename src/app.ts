@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { listen, type Event } from "@tauri-apps/api/event";
 import { bindDevPage, renderDevPage } from "./dev";
-import { renderSettingsPage } from "./settings";
+import { bindSettingsPage, renderSettingsPage } from "./settings";
 import { renderConnectPage } from "./connect";
 import { renderLicensesPage } from "./licenses";
 import { renderHeader } from "./components/header";
@@ -187,8 +187,6 @@ export function initApp() {
   let lampDebounce: ReturnType<typeof setTimeout> | null = null;
   let lampLastNonZero = 50;
   let lampOnState = false;
-  let devClicks = 0;
-  let devClickTimer: ReturnType<typeof setTimeout> | null = null;
 
   let currentPage: "home" | "dev" | "settings" | "connect" | "licenses" = "home";
   let isTransitioning = false;
@@ -290,20 +288,6 @@ export function initApp() {
     void invoke("log_line", { line, tone, ts: "" });
   }
 
-  function onDevClick() {
-    devClicks += 1;
-    if (devClickTimer) {
-      clearTimeout(devClickTimer);
-    }
-    devClickTimer = setTimeout(() => {
-      devClicks = 0;
-    }, 1500);
-    if (devClicks >= 7) {
-      devClicks = 0;
-      logLine("Developer menu unlocked", "SYS");
-      goTo("dev");
-    }
-  }
 
   function getDeviceLabel(address: string) {
     const device = devices.find((d) => d.address === address);
@@ -895,9 +879,10 @@ export function initApp() {
     }
   });
   registerButton.addEventListener("click", registerDevice);
-  if (settingsAppVersionRow) {
-    settingsAppVersionRow.addEventListener("click", onDevClick);
-  }
+  bindSettingsPage(() => {
+    logLine("Developer menu unlocked", "SYS");
+    goTo("dev");
+  });
   navSettings.addEventListener("click", () => {
     goTo("settings");
   });
