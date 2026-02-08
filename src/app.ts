@@ -134,9 +134,9 @@ export function initApp() {
                       <option value="5">반딧불</option>
                     </select>
                   </label>
-                  <label>
+                  <label class="wide">
                     색상
-                    <input id="lampColor" type="color" value="#ffffff" />
+                    ${renderRange({ id: "lampHue", min: 0, max: 360, step: 1, value: 0, className: "range-hue" })}
                   </label>
                 </div>
               `,
@@ -168,7 +168,7 @@ export function initApp() {
   const lampToggle = el<HTMLInputElement>("#lampToggle");
   const lampBrightness = el<HTMLInputElement>("#lampBrightness");
   const lampType = el<HTMLSelectElement>("#lampType");
-  const lampColor = el<HTMLInputElement>("#lampColor");
+  const lampHue = el<HTMLInputElement>("#lampHue");
   const registerList = el<HTMLSelectElement>("#registerList");
   const registeredList = el<HTMLSelectElement>("#registeredList");
   const registerButton = el<HTMLButtonElement>("#registerDevice");
@@ -185,7 +185,7 @@ export function initApp() {
   let volumeDebounce: ReturnType<typeof setTimeout> | null = null;
   let lampBrightnessState: number | null = null;
   let lampTypeState = 1;
-  let lampColorState = "#ffffff";
+  let lampHueState = 0;
   let lampDebounce: ReturnType<typeof setTimeout> | null = null;
   let lampLastNonZero = 50;
   let lampOnState = false;
@@ -368,7 +368,7 @@ export function initApp() {
     lampToggle.disabled = !enabled;
     lampBrightness.disabled = !enabled;
     lampType.disabled = !enabled;
-    lampColor.disabled = !enabled;
+    lampHue.disabled = !enabled;
   }
 
   function updateLampUI() {
@@ -380,17 +380,72 @@ export function initApp() {
     updateRangeFill(lampBrightness);
     lampToggle.checked = lampOnState;
     lampType.value = String(lampTypeState);
-    lampColor.value = lampColorState;
+    lampHue.value = String(lampHueState);
+    updateRangeFill(lampHue);
     setLampEnabled(connectionState === "connected");
   }
 
-  function parseColorHex(hex: string) {
-    const value = hex.replace("#", "");
-    if (value.length !== 6) return [255, 255, 255];
-    const r = parseInt(value.slice(0, 2), 16);
-    const g = parseInt(value.slice(2, 4), 16);
-    const b = parseInt(value.slice(4, 6), 16);
-    return [r, g, b];
+  function sliderToRgb(value: number) {
+    const v = Math.max(0, Math.min(360, value));
+    const whiteBand = 20;
+    if (v <= whiteBand) {
+      const t = v / whiteBand;
+      const r = 255;
+      const g = Math.round(255 - t * 13);
+      const b = Math.round(255 - t * 255);
+      return [r, g, b];
+    }
+    const t = (v - whiteBand) / (360 - whiteBand);
+    const hue = 60 + t * 300;
+    const h = ((hue % 360) + 360) % 360;
+    const c = 1;
+    const x = 1 - Math.abs(((h / 60) % 2) - 1);
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    if (h < 60) {
+      r = c;
+      g = x;
+    } else if (h < 120) {
+      r = x;
+      g = c;
+    } else if (h < 180) {
+      g = c;
+      b = x;
+    } else if (h < 240) {
+      g = x;
+      b = c;
+    } else if (h < 300) {
+      r = x;
+      b = c;
+    } else {
+      r = c;
+      b = x;
+    }
+    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+  }
+
+  function rgbToSlider(r: number, g: number, b: number) {
+    const rf = r / 255;
+    const gf = g / 255;
+    const bf = b / 255;
+    const max = Math.max(rf, gf, bf);
+    const min = Math.min(rf, gf, bf);
+    const delta = max - min;
+    if (delta < 0.05 && max > 0.9) return 0;
+    let hue = 0;
+    if (max === rf) {
+      hue = ((gf - bf) / delta) % 6;
+    } else if (max === gf) {
+      hue = (bf - rf) / delta + 2;
+    } else {
+      hue = (rf - gf) / delta + 4;
+    }
+    hue *= 60;
+    if (hue < 0) hue += 360;
+    if (hue < 60) return 20;
+    const t = (hue - 60) / 300;
+    return Math.round(20 + t * (360 - 20));
   }
 
   async function requestLampState() {
@@ -411,13 +466,13 @@ export function initApp() {
     await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0203, payload: [value] });
   }
 
-  async function setLampColor(value: string) {
-    const [r, g, b] = parseColorHex(value);
+  async function setLampColor(hue: number) {
+    const [r, g, b] = sliderToRgb(hue);
     await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0204, payload: [r, g, b] });
   }
 
-  async function runLamp(mood: number, type: number, color: string) {
-    const [r, g, b] = parseColorHex(color);
+  async function runLamp(mood: number, type: number, hue: number) {
+    const [r, g, b] = sliderToRgb(hue);
     const rounded = Math.round(mood);
     await invoke("send_gaia_command", {
       vendorId: 0x5054,
@@ -837,7 +892,7 @@ export function initApp() {
     lampOnState = lampToggle.checked;
     updateLampUI();
     if (lampOnState) {
-      runLamp(nextValue, lampTypeState, lampColorState).catch((err) => logLine(String(err), "SYS"));
+      runLamp(nextValue, lampTypeState, lampHueState).catch((err) => logLine(String(err), "SYS"));
     } else {
       stopLamp().catch((err) => logLine(String(err), "SYS"));
     }
@@ -866,15 +921,16 @@ export function initApp() {
     if (!lampOnState) return;
     setLampType(value).catch((err) => logLine(String(err), "SYS"));
     if (value === 1) {
-      setLampColor(lampColorState).catch((err) => logLine(String(err), "SYS"));
+      setLampColor(lampHueState).catch((err) => logLine(String(err), "SYS"));
     }
   });
-  lampColor.addEventListener("input", () => {
-    if (lampColor.disabled) return;
-    lampColorState = lampColor.value;
+  lampHue.addEventListener("input", () => {
+    if (lampHue.disabled) return;
+    lampHueState = Number(lampHue.value);
+    updateRangeFill(lampHue);
     if (!lampOnState) return;
     if (lampTypeState === 1) {
-      setLampColor(lampColorState).catch((err) => logLine(String(err), "SYS"));
+      setLampColor(lampHueState).catch((err) => logLine(String(err), "SYS"));
     }
   });
   registerButton.addEventListener("click", registerDevice);
@@ -1012,7 +1068,7 @@ export function initApp() {
         const type = dataPayload[2];
         lampTypeState = type >= 1 && type <= 5 ? type : 1;
         const [r, g, b] = dataPayload.slice(3, 6);
-        lampColorState = `#${toHex(r, 2)}${toHex(g, 2)}${toHex(b, 2)}`;
+        lampHueState = rgbToSlider(r, g, b);
         if (lampBrightnessState > 0) {
           lampLastNonZero = lampBrightnessState;
         }
