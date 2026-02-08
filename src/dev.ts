@@ -15,25 +15,28 @@ export function renderDevPage() {
   const gaiaSection = renderSection({
     title: "GAIA 커맨드 전송",
     body: `
-      <div class="card">
-        <div class="grid">
-          <label>
-            벤더 ID (hex)
-            <input id="vendorId" value="5054" />
-          </label>
-          <label>
-            커맨드 ID (hex)
-            <input id="commandId" value="0201" />
-          </label>
-          <label class="wide">
-            페이로드 (hex)
-            <input id="payload" placeholder="e.g. 1E or 0A0B0C" />
-          </label>
-        </div>
-        <div class="row">
-          <button id="send">전송</button>
-        </div>
-      </div>
+      ${renderList([
+        renderListItem({
+          label: "벤더 ID (hex)",
+          col: true,
+          body: `<input id="vendorId" value="5054"/>`,
+        }),
+        renderListItem({
+          label: "커맨드 ID (hex)",
+          col: true,
+          body: `<input id="commandId" value="0201"/>`,
+        }),
+        renderListItem({
+          label: "페이로드 (hex)",
+          col: true,
+          body: `<input id="payload" placeholder="e.g. 1E or 0A0B0C"/>`,
+        }),
+        renderListItem({
+          label: "전송",
+          col: true,
+          body: `<button id="sendGaia">전송</button>`,
+        }),
+      ])}
     `,
   });
 
