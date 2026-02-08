@@ -200,7 +200,10 @@ body {
   flex: 1;
 }
 
-input,
+input[type="text"],
+input[type="number"],
+input[type="password"],
+input:not([type]),
 button {
   border: 1px solid var(--border);
   border-radius: 8px;
