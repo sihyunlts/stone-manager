@@ -152,7 +152,6 @@ export function initApp() {
     </div>
   `;
 
-  const appTitle = el<HTMLDivElement>("#appTitle");
   const navBackButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-back"));
   const navConnect = el<HTMLButtonElement>("#navConnect");
   const navSettings = el<HTMLButtonElement>("#navSettings");
@@ -181,7 +180,6 @@ export function initApp() {
   let lastBatteryStep: number | null = null;
   let lastDcState: number | null = null;
   let batteryTimer: ReturnType<typeof setInterval> | null = null;
-  let volumeValueState: number | null = null;
   let volumeDebounce: ReturnType<typeof setTimeout> | null = null;
   let lampBrightnessState: number | null = null;
   let lampTypeState = 1;
@@ -189,7 +187,6 @@ export function initApp() {
   let lampDebounce: ReturnType<typeof setTimeout> | null = null;
   let lampLastNonZero = 50;
   let lampOnState = false;
-  let devEnabled = false;
   let devClicks = 0;
   let devClickTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -303,7 +300,6 @@ export function initApp() {
     }, 1500);
     if (devClicks >= 7) {
       devClicks = 0;
-      devEnabled = true;
       logLine("Developer menu unlocked", "SYS");
       goTo("dev");
     }
@@ -365,10 +361,9 @@ export function initApp() {
   }
 
   function setLampEnabled(enabled: boolean) {
-    lampToggle.disabled = !enabled;
-    lampBrightness.disabled = !enabled;
-    lampType.disabled = !enabled;
-    lampHue.disabled = !enabled;
+    [lampToggle, lampBrightness, lampType, lampHue].forEach((input) => {
+      input.disabled = !enabled;
+    });
   }
 
   function updateLampUI() {
@@ -388,64 +383,36 @@ export function initApp() {
   function sliderToRgb(value: number) {
     const v = Math.max(0, Math.min(360, value));
     const whiteBand = 20;
+
     if (v <= whiteBand) {
       const t = v / whiteBand;
-      const r = 255;
-      const g = Math.round(255 - t * 13);
-      const b = Math.round(255 - t * 255);
-      return [r, g, b];
+      return [255, Math.round(255 - t * 13), Math.round(255 - t * 255)];
     }
-    const t = (v - whiteBand) / (360 - whiteBand);
-    const hue = 60 + t * 300;
-    const h = ((hue % 360) + 360) % 360;
-    const c = 1;
-    const x = 1 - Math.abs(((h / 60) % 2) - 1);
-    let r = 0;
-    let g = 0;
-    let b = 0;
-    if (h < 60) {
-      r = c;
-      g = x;
-    } else if (h < 120) {
-      r = x;
-      g = c;
-    } else if (h < 180) {
-      g = c;
-      b = x;
-    } else if (h < 240) {
-      g = x;
-      b = c;
-    } else if (h < 300) {
-      r = x;
-      b = c;
-    } else {
-      r = c;
-      b = x;
-    }
-    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+
+    const h = 60 + ((v - whiteBand) / (360 - whiteBand)) * 300;
+    const f = (n: number) => {
+      const k = (n + h / 60) % 6;
+      return Math.round(255 * (1 - Math.max(0, Math.min(1, Math.min(k, 4 - k)))));
+    };
+    return [f(5), f(3), f(1)];
   }
 
   function rgbToSlider(r: number, g: number, b: number) {
-    const rf = r / 255;
-    const gf = g / 255;
-    const bf = b / 255;
-    const max = Math.max(rf, gf, bf);
-    const min = Math.min(rf, gf, bf);
-    const delta = max - min;
-    if (delta < 0.05 && max > 0.9) return 0;
-    let hue = 0;
-    if (max === rf) {
-      hue = ((gf - bf) / delta) % 6;
-    } else if (max === gf) {
-      hue = (bf - rf) / delta + 2;
-    } else {
-      hue = (rf - gf) / delta + 4;
+    const rf = r / 255, gf = g / 255, bf = b / 255;
+    const max = Math.max(rf, gf, bf), min = Math.min(rf, gf, bf);
+    const d = max - min;
+    if (d < 0.05 && max > 0.9) return 0;
+
+    let h = 0;
+    if (d !== 0) {
+      if (max === rf) h = (gf - bf) / d + (gf < bf ? 6 : 0);
+      else if (max === gf) h = (bf - rf) / d + 2;
+      else h = (rf - gf) / d + 4;
+      h *= 60;
     }
-    hue *= 60;
-    if (hue < 0) hue += 360;
-    if (hue < 60) return 20;
-    const t = (hue - 60) / 300;
-    return Math.round(20 + t * (360 - 20));
+
+    if (h < 60) return 20;
+    return Math.round(20 + ((h - 60) / 300) * 340);
   }
 
   async function requestLampState() {
@@ -490,14 +457,8 @@ export function initApp() {
   }
 
   function updateVolumeUI(value: number | null) {
-    if (value === null || Number.isNaN(value)) {
-      volumeValueState = null;
-      volumeSlider.value = "0";
-      updateRangeFill(volumeSlider);
-      return;
-    }
-    volumeValueState = value;
-    volumeSlider.value = String(value);
+    const v = (value === null || Number.isNaN(value)) ? 0 : value;
+    volumeSlider.value = String(v);
     updateRangeFill(volumeSlider);
   }
 
