@@ -14,7 +14,7 @@ export function renderHeader(options: HeaderOptions) {
   return `
     <header class="app-header" data-tauri-drag-region>
       ${leftSlot}
-      <div class="app-title"${titleAttrs} data-tauri-drag-region="false">${title}</div>
+      <div class="app-title"${titleAttrs} data-tauri-drag-region>${title}</div>
       ${rightSlot}
     </header>
   `;
