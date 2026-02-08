@@ -105,7 +105,10 @@ export function initApp() {
             <section class="statusSection">
               <img src="${stoneImg}" class="device-image"/>
               <span class="status" id="status">STONE이 연결되지 않음</span>
-              <span class="battery" id="battery">--</span>
+              <div class="battery-container">
+                <span class="material-symbols-rounded" id="batteryIcon">battery_android_question</span>
+                <span class="battery" id="battery">--</span>
+              </div>
             </section>
 
             ${renderSection({
@@ -175,6 +178,7 @@ export function initApp() {
   const pageLicenses = el<HTMLDivElement>("#page-licenses");
   const status = el<HTMLDivElement>("#status");
   const battery = el<HTMLDivElement>("#battery");
+  const batteryIcon = el<HTMLSpanElement>("#batteryIcon");
   const volumeSlider = el<HTMLInputElement>("#volumeSlider");
   const lampToggle = el<HTMLInputElement>("#lampToggle");
   const lampBrightness = el<HTMLInputElement>("#lampBrightness");
@@ -349,7 +353,8 @@ export function initApp() {
   }
 
   function resetBatteryState() {
-    battery.textContent = "배터리: --";
+    battery.textContent = "--";
+    batteryIcon.textContent = "battery_android_question";
     lastBatteryStep = null;
     lastDcState = null;
     void invoke("set_tray_battery", { percent: null, charging: false, full: false });
@@ -713,7 +718,8 @@ export function initApp() {
 
   function updateBatteryLabel() {
     if (lastBatteryStep === null) {
-      battery.textContent = "배터리: --";
+      battery.textContent = "--";
+      batteryIcon.textContent = "battery_android_question";
       void invoke("set_tray_battery", { percent: null, charging: false, full: false });
       return;
     }
@@ -742,12 +748,25 @@ export function initApp() {
     let suffix = "";
     const isFull = lastDcState === 1 && lastBatteryStep === 5;
     const isCharging = lastDcState === 3;
-    if (isFull) {
-      suffix = " (충전 완료)";
-    } else if (isCharging) {
+    let icon = "battery_android_question";
+
+    if (isCharging) {
+      icon = "battery_android_frame_bolt";
       suffix = " (충전 중)";
+    } else if (isFull) {
+      icon = "battery_android_frame_full";
+      suffix = " (충전 완료)";
+    } else {
+      if (percent >= 95) icon = "battery_android_frame_full";
+      else if (percent >= 80) icon = "battery_android_6";
+      else if (percent >= 60) icon = "battery_android_5";
+      else if (percent >= 40) icon = "battery_android_4";
+      else if (percent >= 20) icon = "battery_android_2";
+      else icon = "battery_android_1";
     }
+
     battery.textContent = `${percent}%${suffix}`;
+    batteryIcon.textContent = icon;
     void invoke("set_tray_battery", { percent, charging: isCharging, full: isFull });
   }
 

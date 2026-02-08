@@ -153,14 +153,21 @@ body {
   }
 }
 
-.battery {
-  color: var(--muted);
-}
-
 .statusSection {
   align-items: center;
   justify-content: center;
   gap: 12px;
+}
+
+.battery-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+
+  .material-symbols-rounded {
+    font-size: 24px;
+  }
 }
 
 .toggle-row {
