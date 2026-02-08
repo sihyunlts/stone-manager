@@ -1,0 +1,52 @@
+# STONE Manager (Tauri)
+
+STONE Manager (Tauri) is a cross-platform reimplementation of the original Android app for Pantech's STONE Bluetooth speaker.
+
+## Features
+
+| Feature | Status | Notes |
+| :--- | :---: | :--- |
+| **Device Pairing** | 🚧 | Working but unstable |
+| **Battery Level** | 🚧 | Logic needs improvement |
+| **Device Info** | ✅ |  |
+| **Volume Control** | ✅ |  |
+| **Mood Lamp** | ✅ |  |
+
+## Platform Support
+
+| Platform | Status | Notes |
+| :--- | :---: | :--- |
+| **macOS** | ✅ | Fully supported (Only tested on macOS 26) |
+| **Windows** | ❓ | Not tested |
+| **Linux** | ❓ | Not tested |
+| **Android** | ❓ | Not tested |
+| **iOS** | ❓ | Not tested |
+
+## Getting Started
+
+### 1. Prerequisites
+
+- Node.js
+- Rust
+
+### 2. Installation & Running
+
+Clone the repository and install dependencies:
+
+```bash
+git clone https://github.com/sihyunlts/stone-manager.git
+cd stone-manager
+npm install
+```
+
+**Run in Development Mode**:
+
+```bash
+npm run tauri dev
+```
+
+**Production Build**:
+
+```bash
+npm run tauri build
+```
