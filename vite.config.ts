@@ -19,6 +19,15 @@ export default defineConfig({
       },
     }),
   ],
+  css: {
+    preprocessorOptions: {
+      scss: {
+        api: "modern",
+        quietDeps: true,
+        silenceDeprecations: ["import", "global-builtin"]
+      }
+    }
+  },
   clearScreen: false,
   server: {
     port: 5173,

@@ -13,51 +13,23 @@ $material-symbols-font-path: "../node_modules/material-symbols/";
   font-weight: 300;
 }
 
-@font-face {
-  font-family: "Pretendard +100";
-  src: local("※"), url("../node_modules/pretendard/dist/web/static/woff2/Pretendard-ExtraLight.woff2") format("woff2");
-  font-weight: 100;
+@mixin pretendard-font($weight, $file-suffix, $css-weight) {
+  @font-face {
+    font-family: "Pretendard +100";
+    src: local("※"), url("../node_modules/pretendard/dist/web/static/woff2/Pretendard-#{$file-suffix}.woff2") format("woff2");
+    font-weight: $css-weight;
+  }
 }
-@font-face {
-  font-family: "Pretendard +100";
-  src: local("※"), url("../node_modules/pretendard/dist/web/static/woff2/Pretendard-Light.woff2") format("woff2");
-  font-weight: 200;
-}
-@font-face {
-  font-family: "Pretendard +100";
-  src: local("※"), url("../node_modules/pretendard/dist/web/static/woff2/Pretendard-Regular.woff2") format("woff2");
-  font-weight: 300;
-}
-@font-face {
-  font-family: "Pretendard +100";
-  src: local("※"), url("../node_modules/pretendard/dist/web/static/woff2/Pretendard-Medium.woff2") format("woff2");
-  font-weight: 400;
-}
-@font-face {
-  font-family: "Pretendard +100";
-  src: local("※"), url("../node_modules/pretendard/dist/web/static/woff2/Pretendard-SemiBold.woff2") format("woff2");
-  font-weight: 500;
-}
-@font-face {
-  font-family: "Pretendard +100";
-  src: local("※"), url("../node_modules/pretendard/dist/web/static/woff2/Pretendard-Bold.woff2") format("woff2");
-  font-weight: 600;
-}
-@font-face {
-  font-family: "Pretendard +100";
-  src: local("※"), url("../node_modules/pretendard/dist/web/static/woff2/Pretendard-ExtraBold.woff2") format("woff2");
-  font-weight: 700;
-}
-@font-face {
-  font-family: "Pretendard +100";
-  src: local("※"), url("../node_modules/pretendard/dist/web/static/woff2/Pretendard-Black.woff2") format("woff2");
-  font-weight: 800;
-}
-@font-face {
-  font-family: "Pretendard +100";
-  src: local("※"), url("../node_modules/pretendard/dist/web/static/woff2/Pretendard-Black.woff2") format("woff2");
-  font-weight: 900;
-}
+
+@include pretendard-font(100, "ExtraLight", 100);
+@include pretendard-font(200, "Light", 200);
+@include pretendard-font(300, "Regular", 300);
+@include pretendard-font(400, "Medium", 400);
+@include pretendard-font(500, "SemiBold", 500);
+@include pretendard-font(600, "Bold", 600);
+@include pretendard-font(700, "ExtraBold", 700);
+@include pretendard-font(800, "Black", 800);
+@include pretendard-font(900, "Black", 900);
 
 @font-face {
   font-family: "Geist Sans";
@@ -84,7 +56,7 @@ $material-symbols-font-path: "../node_modules/material-symbols/";
   --muted: #b2b2b2;
   --log-in: #73b9d7;
   --log-out: #df72a0;
-  font-family: "Geist Sans", "Pretendard +100", "Pretendard Variable", -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+  font-family: "Geist Sans", "Pretendard +100", "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
 }
 
 * {
