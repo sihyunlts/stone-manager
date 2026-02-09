@@ -87,20 +87,38 @@ export function initApp() {
   app.innerHTML = `
     <div class="app-shell">
       <div id="pageHost">
-        <div class="page" id="page-home" data-page="home">
+        <div class="page home-shell" id="page-home" data-page="home">
           ${renderHeader({
             title: "STONE 매니저",
             titleId: "appTitle",
             showBack: false,
+            showSidebarToggle: true,
             right: `
-              <button class="nav-connect" id="navConnect" data-tauri-drag-region="false">
-                <span class="material-symbols-rounded">bluetooth</span>
-              </button>
               <button class="nav-info" id="navSettings" data-tauri-drag-region="false">
                 <span class="material-symbols-rounded">settings</span>
               </button>
             `,
           })}
+
+          <aside class="sidebar" id="sidebar">
+            <div class="sidebar-body">
+              <button class="sidebar-item active" id="sidebar-1">
+                <span class="material-symbols-rounded">speaker</span>
+                <span>STONE White</span>
+              </button>
+              <button class="sidebar-item" id="sidebar-2">
+                <span class="material-symbols-rounded">speaker</span>
+                <span>STONE Black</span>
+              </button>
+            </div>
+            <div class="sidebar-footer">
+              <button class="sidebar-item" id="sidebar-pair">
+                <span class="material-symbols-rounded">add</span>
+                <span>새 기기 추가</span>
+              </button>
+            </div>
+          </aside>
+
           <main class="layout">
             <section class="statusSection">
               <img src="${stoneImg}" class="device-image"/>
@@ -168,8 +186,10 @@ export function initApp() {
   `;
 
   const navBackButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-back"));
-  const navConnect = el<HTMLButtonElement>("#navConnect");
+  const navSidebarButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-sidebar"));
   const navSettings = el<HTMLButtonElement>("#navSettings");
+  const sidebarPair = el<HTMLButtonElement>("#sidebar-pair");
+  const homeShell = el<HTMLDivElement>("#page-home");
   const pageHost = el<HTMLDivElement>("#pageHost");
   const pageHome = el<HTMLDivElement>("#page-home");
   const pageDev = el<HTMLDivElement>("#page-dev");
@@ -921,7 +941,7 @@ export function initApp() {
   navSettings.addEventListener("click", () => {
     goTo("settings");
   });
-  navConnect.addEventListener("click", () => {
+  sidebarPair.addEventListener("click", () => {
     goTo("connect");
   });
   const navLicenses = el<HTMLDivElement>("#navLicenses");
@@ -944,6 +964,12 @@ export function initApp() {
   navBackButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
       goBack();
+    });
+  });
+
+  navSidebarButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      homeShell.classList.toggle("is-sidebar-collapsed");
     });
   });
   removeButton.addEventListener("click", () => {
