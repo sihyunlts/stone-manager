@@ -95,6 +95,12 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
   trigger.addEventListener("click", (event) => {
     event.stopPropagation();
     if (root.classList.contains("is-disabled")) return;
+    document.querySelectorAll<HTMLElement>(".select.is-open").forEach((openSelect) => {
+      if (openSelect === root) return;
+      openSelect.classList.remove("is-open");
+      const openTrigger = openSelect.querySelector<HTMLButtonElement>(".select-trigger");
+      if (openTrigger) openTrigger.setAttribute("aria-expanded", "false");
+    });
     const direction = root.dataset.direction ?? "down";
     root.classList.toggle("is-up", direction === "up");
     root.classList.toggle("is-down", direction === "down");
