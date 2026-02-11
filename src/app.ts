@@ -190,8 +190,8 @@ export function initApp() {
       leave.style.zIndex = "0";
     }
     currentPage = to;
-    if (to === "dev" || to === "settings") {
-      requestAllDeviceInfo();
+    if (to === "settings") {
+      requestDynamicDeviceInfo();
     }
     pageHost.style.pointerEvents = "";
     isTransitioning = false;
@@ -429,6 +429,7 @@ export function initApp() {
     requestBattery().catch((err) => logLine(String(err), "SYS"));
     requestVolume().catch((err) => logLine(String(err), "SYS"));
     requestLampState().catch((err) => logLine(String(err), "SYS"));
+    requestStaticDeviceInfo();
     stopBatteryPolling();
     batteryTimer = setInterval(requestBattery, 30_000);
     updateVolumeUI();
@@ -641,12 +642,15 @@ export function initApp() {
     }
   }
 
-  function requestAllDeviceInfo() {
+  function requestStaticDeviceInfo() {
     requestDeviceInfo(0x0451).catch(() => {});
     requestDeviceInfo(0x0452).catch(() => {});
     requestDeviceInfo(0x0453).catch(() => {});
-    requestDeviceInfo(0x0454).catch(() => {});
     requestDeviceInfo(0x0457).catch(() => {});
+  }
+
+  function requestDynamicDeviceInfo() {
+    requestDeviceInfo(0x0454).catch(() => {});
   }
 
   async function requestSdpQuery() {
