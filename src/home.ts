@@ -30,6 +30,7 @@ export function renderHomePage() {
             <span class="material-symbols-rounded" id="batteryIcon">battery_android_question</span>
             <span class="battery" id="battery">--</span>
           </div>
+          <button class="status-action" id="statusAction">연결</button>
         </section>
 
         ${renderSection({

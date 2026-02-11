@@ -5,7 +5,6 @@ import { bindDevPage, renderDevPage } from "./dev";
 import { bindSettingsPage, renderSettingsPage } from "./settings";
 import {
   initConnectController,
-  renderConnectPage,
   type ConnectResultEvent,
   type DeviceStateEvent,
 } from "./connect";
@@ -17,6 +16,7 @@ import { animate } from "motion";
 import {
   getConnectionSnapshot,
   setConnectionSnapshot,
+  subscribeConnection,
   type ConnectionState,
 } from "./state/connection";
 import {
@@ -74,7 +74,6 @@ export function initApp() {
     <div class="app-shell">
       <div id="pageHost">
         ${renderHomePage()}
-        ${renderConnectPage()}
         ${renderPairingPage()}
         ${renderSettingsPage()}
         ${renderDevPage()}
@@ -91,7 +90,6 @@ export function initApp() {
   const pageHome = el<HTMLDivElement>("#page-home");
   const pageDev = el<HTMLDivElement>("#page-dev");
   const pageSettings = el<HTMLDivElement>("#page-settings");
-  const pageConnect = el<HTMLDivElement>("#page-connect");
   const pagePairing = el<HTMLDivElement>("#page-pairing");
   const pageLicenses = el<HTMLDivElement>("#page-licenses");
   const homeShell = pageHome;
@@ -99,6 +97,7 @@ export function initApp() {
   const status = el<HTMLDivElement>("#status");
   const battery = el<HTMLDivElement>("#battery");
   const batteryIcon = el<HTMLSpanElement>("#batteryIcon");
+  const statusAction = el<HTMLButtonElement>("#statusAction");
   const sectionSound = el<HTMLElement>("#sectionSound");
   const sectionLamp = el<HTMLElement>("#sectionLamp");
   const settingsStoneInfo = document.querySelector<HTMLElement>("#settingsStoneInfo");
@@ -112,9 +111,9 @@ export function initApp() {
   let connectController: ReturnType<typeof initConnectController> | null = null;
   let deviceSelectBinding: ReturnType<typeof bindSelect> | null = null;
 
-  let currentPage: "home" | "dev" | "settings" | "connect" | "pairing" | "licenses" = "home";
+  let currentPage: "home" | "dev" | "settings" | "pairing" | "licenses" = "home";
   let isTransitioning = false;
-  const pageHistory: Array<"home" | "dev" | "settings" | "connect" | "pairing" | "licenses"> = [];
+  const pageHistory: Array<"home" | "dev" | "settings" | "pairing" | "licenses"> = [];
 
   pageHome.style.filter = "brightness(1)";
   pageDev.style.zIndex = "0";
@@ -122,20 +121,18 @@ export function initApp() {
   animate(pageHome, { x: "0%" }, { duration: 0 });
   animate(pageDev, { x: "100%" }, { duration: 0 });
   animate(pageSettings, { x: "100%" }, { duration: 0 });
-  animate(pageConnect, { x: "100%" }, { duration: 0 });
   animate(pagePairing, { x: "100%" }, { duration: 0 });
   animate(pageLicenses, { x: "100%" }, { duration: 0 });
   function resetPageStack() {
     pageHome.style.zIndex = "0";
     pageDev.style.zIndex = "0";
     pageSettings.style.zIndex = "0";
-    pageConnect.style.zIndex = "0";
     pagePairing.style.zIndex = "0";
     pageLicenses.style.zIndex = "0";
   }
 
   async function navigate(
-    to: "home" | "dev" | "settings" | "connect" | "pairing" | "licenses",
+    to: "home" | "dev" | "settings" | "pairing" | "licenses",
     direction: "forward" | "back"
   ) {
     if (isTransitioning || to === currentPage) return;
@@ -146,25 +143,21 @@ export function initApp() {
         ? pageDev
         : to === "settings"
           ? pageSettings
-          : to === "connect"
-            ? pageConnect
-            : to === "pairing"
-              ? pagePairing
-              : to === "licenses"
-                ? pageLicenses
-                : pageHome;
+      : to === "pairing"
+        ? pagePairing
+        : to === "licenses"
+          ? pageLicenses
+          : pageHome;
     const leave =
       currentPage === "dev"
         ? pageDev
         : currentPage === "settings"
           ? pageSettings
-          : currentPage === "connect"
-            ? pageConnect
-            : currentPage === "pairing"
-              ? pagePairing
-              : currentPage === "licenses"
-                ? pageLicenses
-                : pageHome;
+      : currentPage === "pairing"
+        ? pagePairing
+        : currentPage === "licenses"
+          ? pageLicenses
+          : pageHome;
     resetPageStack();
     if (direction === "forward") {
       bring.style.zIndex = "2";
@@ -202,7 +195,7 @@ export function initApp() {
     isTransitioning = false;
   }
 
-  function goTo(to: "home" | "dev" | "settings" | "connect" | "pairing" | "licenses") {
+  function goTo(to: "home" | "dev" | "settings" | "pairing" | "licenses") {
     if (isTransitioning || to === currentPage) return;
     pageHistory.push(currentPage);
     void navigate(to, "forward");
@@ -270,6 +263,7 @@ export function initApp() {
 
   function syncActiveDeviceUI() {
     updateConnectionStatus();
+    updateStatusAction();
     updateBatteryLabel();
     updateVolumeUI();
     updateLampUI();
@@ -477,6 +471,22 @@ export function initApp() {
         status.textContent = `${getActiveDeviceLabel() ?? "STONE"}이 연결되지 않음`;
         status.classList.remove("connected");
         break;
+    }
+  }
+
+  function updateStatusAction() {
+    const active = getActiveDeviceAddress();
+    if (!active) {
+      statusAction.style.display = "none";
+      return;
+    }
+    statusAction.style.display = "";
+    if (isActiveDeviceConnected()) {
+      statusAction.textContent = "연결 끊기";
+      statusAction.dataset.action = "disconnect";
+    } else {
+      statusAction.textContent = "연결";
+      statusAction.dataset.action = "connect";
     }
   }
 
@@ -707,11 +717,20 @@ export function initApp() {
     logLine("Developer menu unlocked", "SYS");
     goTo("dev");
   });
+  statusAction.addEventListener("click", () => {
+    const active = getActiveDeviceAddress();
+    if (!active || !connectController) return;
+    if (isActiveDeviceConnected()) {
+      void connectController.disconnect();
+    } else {
+      void connectController.connectAddress(active);
+    }
+  });
   navSettings.addEventListener("click", () => {
     goTo("settings");
   });
   navConnect.addEventListener("click", () => {
-    goTo("connect");
+    goTo("pairing");
   });
   const navLicenses = el<HTMLDivElement>("#navLicenses");
   if (navLicenses) {
@@ -750,6 +769,9 @@ export function initApp() {
   });
   subscribeActiveDevice(() => {
     renderDeviceTitle();
+    syncActiveDeviceUI();
+  });
+  subscribeConnection(() => {
     syncActiveDeviceUI();
   });
 
