@@ -3,6 +3,11 @@ import { renderHeader } from "./components/header";
 import { renderSection } from "./components/section";
 import { renderList, renderListItem } from "./components/list";
 import type { ConnectionState } from "./state/connection";
+import {
+  getRegisteredDevices,
+  removeRegisteredDevice,
+  upsertRegisteredDevice,
+} from "./state/devices";
 
 export type DeviceInfo = {
   name: string;
@@ -10,11 +15,6 @@ export type DeviceInfo = {
   connected: boolean;
   alias?: string | null;
   raw_name?: string | null;
-};
-
-export type PairedDevice = {
-  address: string;
-  name: string;
 };
 
 export type { ConnectionState } from "./state/connection";
@@ -104,24 +104,6 @@ export function renderConnectPage() {
   `;
 }
 
-const PAIRED_STORAGE_KEY = "stone_paired_devices";
-
-function loadPairedDevices(): PairedDevice[] {
-  try {
-    const raw = localStorage.getItem(PAIRED_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item) => item && typeof item.address === "string");
-  } catch {
-    return [];
-  }
-}
-
-function savePairedDevices(list: PairedDevice[]) {
-  localStorage.setItem(PAIRED_STORAGE_KEY, JSON.stringify(list));
-}
-
 export function initConnectController(deps: ConnectControllerDeps) {
   const registerList = document.querySelector<HTMLDivElement>("#registerList");
   const registeredList = document.querySelector<HTMLDivElement>("#registeredList");
@@ -134,7 +116,6 @@ export function initConnectController(deps: ConnectControllerDeps) {
   const navPairing = document.querySelector<HTMLButtonElement>("#navPairing");
 
   let devices: DeviceInfo[] = [];
-  let pairedDevices = loadPairedDevices();
   let registerSelected = "";
   let registeredSelected = "";
   let registerPending: string | null = null;
@@ -142,7 +123,7 @@ export function initConnectController(deps: ConnectControllerDeps) {
   function getDeviceLabel(address: string) {
     const device = devices.find((d) => d.address === address);
     if (device?.name) return device.name;
-    const paired = pairedDevices.find((d) => d.address === address);
+    const paired = getRegisteredDevices().find((d) => d.address === address);
     return paired?.name ?? address;
   }
 
@@ -210,6 +191,7 @@ export function initConnectController(deps: ConnectControllerDeps) {
   function renderRegisteredList() {
     if (!registeredList) return;
     const previous = registeredSelected;
+    const pairedDevices = getRegisteredDevices();
     if (pairedDevices.length === 0) {
       registeredSelected = "";
       registeredList.innerHTML = renderList([
@@ -222,13 +204,11 @@ export function initConnectController(deps: ConnectControllerDeps) {
       return;
     }
 
-    const options = pairedDevices
-      .filter((paired) => paired.address !== deps.getConnectedAddress())
-      .map((paired) => {
-        const device = devices.find((d) => d.address === paired.address);
-        const name = device?.name ?? paired.name ?? paired.address;
-        return { address: paired.address, label: name };
-      });
+    const options = pairedDevices.map((paired) => {
+      const device = devices.find((d) => d.address === paired.address);
+      const name = device?.name ?? paired.name ?? paired.address;
+      return { address: paired.address, label: name };
+    });
     registeredList.innerHTML = renderList(
       options.map((opt) =>
         renderListItem({
@@ -276,20 +256,13 @@ export function initConnectController(deps: ConnectControllerDeps) {
   function upsertPairedDevice(address: string) {
     if (!address) return;
     const latestName = devices.find((d) => d.address === address)?.name ?? address;
-    const existing = pairedDevices.findIndex((d) => d.address === address);
-    if (existing >= 0) {
-      pairedDevices[existing].name = latestName;
-    } else {
-      pairedDevices.unshift({ address, name: latestName });
-    }
-    savePairedDevices(pairedDevices);
+    upsertRegisteredDevice(address, latestName);
     renderRegisteredList();
   }
 
   function removePairedDevice(address: string) {
     if (!address) return;
-    pairedDevices = pairedDevices.filter((d) => d.address !== address);
-    savePairedDevices(pairedDevices);
+    removeRegisteredDevice(address);
     renderRegisteredList();
   }
 
