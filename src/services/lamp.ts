@@ -9,6 +9,7 @@ import { logLine } from "../utils/formatter";
 let lampToggleEl: HTMLInputElement | null = null;
 let lampBrightnessEl: HTMLInputElement | null = null;
 let lampHueEl: HTMLInputElement | null = null;
+let lampSettingsEl: HTMLElement | null = null;
 let lampTypeSelect: ReturnType<typeof bindSelect> | null = null;
 let lampDebounce: ReturnType<typeof setTimeout> | null = null;
 
@@ -16,6 +17,7 @@ export function initLamp() {
   lampToggleEl = document.querySelector<HTMLInputElement>("#lampToggle");
   lampBrightnessEl = document.querySelector<HTMLInputElement>("#lampBrightness");
   lampHueEl = document.querySelector<HTMLInputElement>("#lampHue");
+  lampSettingsEl = document.querySelector<HTMLElement>("#lampSettings");
 
   lampTypeSelect = bindSelect("lampType", (value) => {
     const next = Number(value);
@@ -87,6 +89,9 @@ export function updateLampUI() {
   lampTypeSelect?.setValue(data.lampType);
   lampHueEl.value = String(data.lampHue);
   updateRangeFill(lampHueEl);
+  if (lampSettingsEl) {
+    lampSettingsEl.classList.toggle("is-hidden", !data.lampOn);
+  }
 }
 
 export function sliderToRgb(value: number) {

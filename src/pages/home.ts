@@ -55,30 +55,32 @@ export function renderHomePage() {
                 right: renderToggle({ id: "lampToggle" }),
               }),
             ])}
-            ${renderList([
-              renderListItem({
-                label: "조명 밝기",
-                col: true,
-                body: renderRange({ id: "lampBrightness", min: 0, max: 100, step: 0.1, value: 0, className: "thumb-vertical" }),
-              }),
-              renderListItem({
-                    label: "조명 색상",
-                    right: renderSelect({
-                      id: "lampType",
-                      value: 1,
-                      direction: "up",
-                      options: [
-                        { value: 1, label: "단일 색상" },
-                        { value: 2, label: "촛불" },
-                        { value: 3, label: "오로라" },
-                        { value: 4, label: "파도" },
-                        { value: 5, label: "반딧불" },
-                      ],
-                    }),
-                    col: true,
-                    body: renderRange({ id: "lampHue", min: 0, max: 360, step: 1, value: 0, className: "range-hue" }),
-              }),
-            ])}
+            <div id="lampSettings" class="collapsible-group">
+              ${renderList([
+                renderListItem({
+                  label: "조명 밝기",
+                  col: true,
+                  body: renderRange({ id: "lampBrightness", min: 0, max: 100, step: 0.1, value: 0, className: "thumb-vertical" }),
+                }),
+                renderListItem({
+                      label: "조명 색상",
+                      right: renderSelect({
+                        id: "lampType",
+                        value: 1,
+                        direction: "up",
+                        options: [
+                          { value: 1, label: "단일 색상" },
+                          { value: 2, label: "촛불" },
+                          { value: 3, label: "오로라" },
+                          { value: 4, label: "파도" },
+                          { value: 5, label: "반딧불" },
+                        ],
+                      }),
+                      col: true,
+                      body: renderRange({ id: "lampHue", min: 0, max: 360, step: 1, value: 0, className: "range-hue" }),
+                }),
+              ])}
+            </div>
           `,
         })}
       </main>
