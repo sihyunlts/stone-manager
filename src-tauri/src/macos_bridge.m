@@ -41,8 +41,30 @@ static void runOnMainSync(void (^block)(void)) {
 }
 
 - (void)sdpQueryComplete:(IOBluetoothDevice *)device status:(IOReturn)status {
-    (void)device;
-    (void)status;
+    NSString *addr = device.addressString ?: @"";
+    BTLOG(@"SDP query complete: status=%d (%@)", (int)status, addr);
+    if (!device) {
+        return;
+    }
+    NSArray *services = device.services;
+    if (!services || services.count == 0) {
+        BTLOG(@"SDP services: none (%@)", addr);
+        return;
+    }
+    BTLOG(@"SDP services: %lu (%@)", (unsigned long)services.count, addr);
+    for (IOBluetoothSDPServiceRecord *record in services) {
+        NSString *name = [record getServiceName];
+        if (!name || name.length == 0) {
+            name = @"(unknown)";
+        }
+        BluetoothRFCOMMChannelID channelID = 0;
+        IOReturn rfcommStatus = [record getRFCOMMChannelID:&channelID];
+        if (rfcommStatus == kIOReturnSuccess) {
+            BTLOG(@"SDP service: %@ (rfcomm=%d)", name, (int)channelID);
+        } else {
+            BTLOG(@"SDP service: %@ (rfcomm=none)", name);
+        }
+    }
 }
 
 + (instancetype)shared {
@@ -341,6 +363,22 @@ static void runOnMainSync(void (^block)(void)) {
 
 @end
 
+static IOBluetoothDevice *findDeviceForAddress(NSString *address) {
+    if (!address || address.length == 0) {
+        return nil;
+    }
+    IOBluetoothDevice *device = [IOBluetoothDevice deviceWithAddressString:address];
+    if (device) {
+        return device;
+    }
+    for (IOBluetoothDevice *candidate in [IOBluetoothDevice pairedDevices]) {
+        if ([[candidate addressString] caseInsensitiveCompare:address] == NSOrderedSame) {
+            return candidate;
+        }
+    }
+    return nil;
+}
+
 char *macos_bt_list_paired_devices(void) {
     __block char *result = NULL;
     void (^work)(void) = ^{
@@ -390,6 +428,36 @@ char *macos_bt_list_paired_devices(void) {
         return strdup("[]");
     }
     return result;
+}
+
+int macos_bt_sdp_query(const char *address) {
+    if (!address) {
+        return (int)kIOReturnBadArgument;
+    }
+    NSString *addr = [NSString stringWithUTF8String:address];
+    if (!addr || addr.length == 0) {
+        return (int)kIOReturnBadArgument;
+    }
+
+    __block IOReturn status = kIOReturnError;
+    runOnMainSync(^{
+        @try {
+            IOBluetoothDevice *device = findDeviceForAddress(addr);
+            if (!device) {
+                [StoneBluetoothManager shared].lastErrorContext = @"device_not_found";
+                BTLOG(@"SDP device not found: %@", addr);
+                status = kIOReturnNotFound;
+                return;
+            }
+            [StoneBluetoothManager shared].device = device;
+            status = [device performSDPQuery:[StoneBluetoothManager shared]];
+            BTLOG(@"SDP query kick: status=%d (%@)", (int)status, addr);
+        } @catch (NSException *exception) {
+            [StoneBluetoothManager shared].lastErrorContext = [NSString stringWithFormat:@"exception:%@", exception.name];
+            status = kIOReturnError;
+        }
+    });
+    return (int)status;
 }
 
 char *macos_bt_get_connection_info(void) {

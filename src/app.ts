@@ -644,8 +644,23 @@ export function initApp() {
     requestDeviceInfo(0x0457).catch(() => {});
   }
 
+  async function requestSdpQuery() {
+    const address = getActiveDeviceAddress();
+    if (!address) {
+      logLine("No active device selected", "SYS");
+      return;
+    }
+    try {
+      await invoke("sdp_query", { address });
+      logLine(`SDP query request (${address})`, "SYS");
+    } catch (err) {
+      logLine(String(err), "SYS");
+    }
+  }
+
   bindDevPage({
     onSend: sendCommand,
+    onSdpQuery: requestSdpQuery,
   });
   loadAppVersion().catch(() => {});
   battery.addEventListener("click", requestBattery);

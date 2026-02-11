@@ -210,6 +210,7 @@ extern "C" {
     fn macos_bt_connect(address: *const std::os::raw::c_char) -> i32;
     fn macos_bt_disconnect();
     fn macos_bt_write(data: *const u8, len: usize) -> i32;
+    fn macos_bt_sdp_query(address: *const std::os::raw::c_char) -> i32;
     fn macos_bt_last_error_context() -> *mut std::os::raw::c_char;
     fn macos_bt_get_connection_info() -> *mut std::os::raw::c_char;
 }
@@ -435,6 +436,34 @@ async fn send_gaia_command(vendor_id: u16, command_id: u16, payload: Vec<u8>) ->
 }
 
 #[tauri::command]
+async fn sdp_query(address: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        back_log("RUST", format!("SDP query request: {}", address));
+        let status = tauri::async_runtime::spawn_blocking(move || -> Result<i32, String> {
+            let cstr = CString::new(address).map_err(|_| "Invalid address".to_string())?;
+            Ok(unsafe { macos_bt_sdp_query(cstr.as_ptr()) })
+        })
+        .await
+        .map_err(|_| "Join error".to_string())??;
+        if status == 0 {
+            Ok(())
+        } else {
+            Err(format!(
+                "IOBluetooth error {} ({}) (sdp_query)",
+                status,
+                ioreturn_name(status)
+            ))
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = address;
+        Err("Not supported on this platform".to_string())
+    }
+}
+#[tauri::command]
 fn log_line(line: String, tone: String, _ts: String) {
     println!("[STONE][FRONT][{}] {}", tone, line);
 }
@@ -546,6 +575,7 @@ fn main() {
             connect_device_async,
             disconnect_device,
             send_gaia_command,
+            sdp_query,
             log_line,
             set_tray_battery,
             open_url

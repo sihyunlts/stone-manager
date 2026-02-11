@@ -4,6 +4,7 @@ import { renderList, renderListItem } from "../components/list";
 
 type DevPageHandlers = {
   onSend: (vendorIdHex: string, commandIdHex: string, payloadHex: string) => void | Promise<void>;
+  onSdpQuery: () => void | Promise<void>;
 };
 
 function getInputValue(selector: string) {
@@ -34,6 +35,9 @@ export function renderDevPage() {
         renderListItem({
           body: `<button id="sendGaia">전송</button>`,
         }),
+        renderListItem({
+          body: `<button id="sdpQuery">SDP 쿼리</button>`,
+        }),
       ])}
     `,
   });
@@ -58,13 +62,20 @@ export function renderDevPage() {
 }
 
 export function bindDevPage(handlers: DevPageHandlers) {
-  const sendButton = document.querySelector<HTMLButtonElement>("#send");
-  if (!sendButton) return;
-  sendButton.addEventListener("click", () => {
+  const sendButton = document.querySelector<HTMLButtonElement>("#sendGaia");
+  if (sendButton) {
+    sendButton.addEventListener("click", () => {
     handlers.onSend(
       getInputValue("#vendorId"),
       getInputValue("#commandId"),
       getInputValue("#payload")
     );
-  });
+    });
+  }
+  const sdpButton = document.querySelector<HTMLButtonElement>("#sdpQuery");
+  if (sdpButton) {
+    sdpButton.addEventListener("click", () => {
+      handlers.onSdpQuery();
+    });
+  }
 }
