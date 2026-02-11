@@ -22,6 +22,7 @@ import {
 import {
   getActiveDeviceAddress,
   getRegisteredDevices,
+  removeRegisteredDevice,
   setActiveDeviceAddress,
   subscribeActiveDevice,
   subscribeRegisteredDevices,
@@ -98,6 +99,7 @@ export function initApp() {
   const battery = el<HTMLDivElement>("#battery");
   const batteryIcon = el<HTMLSpanElement>("#batteryIcon");
   const statusAction = el<HTMLButtonElement>("#statusAction");
+  const statusUnpair = el<HTMLButtonElement>("#statusUnpair");
   const sectionSound = el<HTMLElement>("#sectionSound");
   const sectionLamp = el<HTMLElement>("#sectionLamp");
   const settingsStoneInfo = document.querySelector<HTMLElement>("#settingsStoneInfo");
@@ -478,15 +480,18 @@ export function initApp() {
     const active = getActiveDeviceAddress();
     if (!active) {
       statusAction.style.display = "none";
+      statusUnpair.style.display = "none";
       return;
     }
     statusAction.style.display = "";
     if (isActiveDeviceConnected()) {
       statusAction.textContent = "연결 끊기";
       statusAction.dataset.action = "disconnect";
+      statusUnpair.style.display = "none";
     } else {
       statusAction.textContent = "연결";
       statusAction.dataset.action = "connect";
+      statusUnpair.style.display = "";
     }
   }
 
@@ -739,6 +744,16 @@ export function initApp() {
       void connectController.disconnect();
     } else {
       void connectController.connectAddress(active);
+    }
+  });
+  statusUnpair.addEventListener("click", () => {
+    const active = getActiveDeviceAddress();
+    if (!active) return;
+    if (isActiveDeviceConnected()) return;
+    const snapshot = getConnectionSnapshot();
+    removeRegisteredDevice(active);
+    if (snapshot.address === active && snapshot.state !== "connected") {
+      setConnectionSnapshot("idle", null);
     }
   });
   navSettings.addEventListener("click", () => {

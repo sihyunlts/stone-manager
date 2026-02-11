@@ -31,6 +31,7 @@ export function renderHomePage() {
             <span class="battery" id="battery">--</span>
           </div>
           <button class="status-action" id="statusAction">연결</button>
+          <button class="status-action status-unpair" id="statusUnpair">등록 해제</button>
         </section>
 
         ${renderSection({

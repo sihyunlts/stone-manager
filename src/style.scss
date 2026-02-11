@@ -144,6 +144,10 @@ body {
   min-width: 120px;
 }
 
+.status-unpair {
+  background: var(--accent-2);
+}
+
 .battery-container {
   display: flex;
   align-items: center;
