@@ -22,6 +22,8 @@ extern void macos_bt_on_device_event(const char *address, int connected);
 
 @implementation StoneBluetoothManager
 
+static IOBluetoothDevice *findDeviceForAddress(NSString *address);
+
 static void runOnMainSync(void (^block)(void)) {
     if ([NSThread isMainThread]) {
         block();
@@ -82,11 +84,6 @@ static void runOnMainSync(void (^block)(void)) {
     }
     if (!self.disconnectNotifications) {
         self.disconnectNotifications = [NSMutableDictionary dictionary];
-    }
-    for (IOBluetoothDevice *device in [IOBluetoothDevice pairedDevices]) {
-        if ([device isConnected]) {
-            [self registerDisconnectNotification:device];
-        }
     }
 }
 
@@ -198,15 +195,7 @@ static void runOnMainSync(void (^block)(void)) {
         }
     }
 
-    IOBluetoothDevice *device = [IOBluetoothDevice deviceWithAddressString:address];
-    if (!device) {
-        for (IOBluetoothDevice *candidate in [IOBluetoothDevice pairedDevices]) {
-            if ([[candidate addressString] caseInsensitiveCompare:address] == NSOrderedSame) {
-                device = candidate;
-                break;
-            }
-        }
-    }
+    IOBluetoothDevice *device = findDeviceForAddress(address);
 
     if (!device) {
         self.lastErrorContext = @"device_not_found";
@@ -215,6 +204,7 @@ static void runOnMainSync(void (^block)(void)) {
     }
 
     self.device = device;
+    [self registerDisconnectNotification:device];
     self.lastErrorContext = @"connect_start";
     BTLOG(@"Connect start: %@ (%@)", device.name, device.addressString);
 
