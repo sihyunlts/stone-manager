@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { renderHeader } from "./components/header";
 import { renderSection } from "./components/section";
 import { renderList, renderListItem } from "./components/list";
+import type { ConnectionState } from "./state/connection";
 
 export type DeviceInfo = {
   name: string;
@@ -16,7 +17,7 @@ export type PairedDevice = {
   name: string;
 };
 
-export type ConnectionState = "idle" | "connecting" | "connected" | "disconnecting";
+export type { ConnectionState } from "./state/connection";
 
 export type ConnectResultEvent = {
   address: string;

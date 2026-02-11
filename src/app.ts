@@ -6,7 +6,6 @@ import { bindSettingsPage, renderSettingsPage } from "./settings";
 import {
   initConnectController,
   renderConnectPage,
-  type ConnectionState,
   type ConnectResultEvent,
   type DeviceStateEvent,
 } from "./connect";
@@ -20,6 +19,11 @@ import { renderSection } from "./components/section";
 import { bindSelect, renderSelect } from "./components/select";
 import { animate } from "motion";
 import stoneImg from "./assets/stone.png";
+import {
+  getConnectionSnapshot,
+  setConnectionSnapshot,
+  type ConnectionState,
+} from "./state/connection";
 
 type GaiaPacketEvent = {
   vendor_id: number;
@@ -161,8 +165,6 @@ export function initApp() {
   const lampToggle = el<HTMLInputElement>("#lampToggle");
   const lampBrightness = el<HTMLInputElement>("#lampBrightness");
   const lampHue = el<HTMLInputElement>("#lampHue");
-  let connectionState: ConnectionState = "idle";
-  let connectedAddress: string | null = null;
   let lastBatteryStep: number | null = null;
   let lastDcState: number | null = null;
   let batteryTimer: ReturnType<typeof setInterval> | null = null;
@@ -283,8 +285,8 @@ export function initApp() {
 
   connectController = initConnectController({
     logLine,
-    getConnectionState: () => connectionState,
-    getConnectedAddress: () => connectedAddress,
+    getConnectionState: () => getConnectionSnapshot().state,
+    getConnectedAddress: () => getConnectionSnapshot().address,
     setConnectionState,
     setConnected,
     setDisconnected,
@@ -336,7 +338,7 @@ export function initApp() {
     lampTypeSelect?.setValue(lampTypeState);
     lampHue.value = String(lampHueState);
     updateRangeFill(lampHue);
-    setLampEnabled(connectionState === "connected");
+    setLampEnabled(getConnectionSnapshot().state === "connected");
   }
 
   function sliderToRgb(value: number) {
@@ -462,7 +464,8 @@ export function initApp() {
   }
 
   function updateConnectionStatus() {
-    switch (connectionState) {
+    const { state, address } = getConnectionSnapshot();
+    switch (state) {
       case "connecting":
         status.textContent = "연결 중...";
         status.classList.remove("connected");
@@ -472,8 +475,8 @@ export function initApp() {
         status.classList.remove("connected");
         break;
       case "connected": {
-        const label = connectedAddress
-          ? connectController?.getDeviceLabel(connectedAddress) ?? connectedAddress
+        const label = address
+          ? connectController?.getDeviceLabel(address) ?? address
           : "Unknown";
         status.textContent = `${label}`;
         status.classList.add("connected");
@@ -487,9 +490,9 @@ export function initApp() {
     }
   }
 
-  function setConnectionState(state: ConnectionState, address: string | null = connectedAddress) {
-    connectionState = state;
-    connectedAddress = address;
+  function setConnectionState(state: ConnectionState, address?: string | null) {
+    const nextAddress = address !== undefined ? address : getConnectionSnapshot().address;
+    setConnectionSnapshot(state, nextAddress);
     updateConnectionStatus();
   }
 
