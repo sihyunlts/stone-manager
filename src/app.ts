@@ -24,6 +24,18 @@ import {
   setConnectionSnapshot,
   type ConnectionState,
 } from "./state/connection";
+import {
+  getActiveDeviceAddress,
+  getRegisteredDevices,
+  setActiveDeviceAddress,
+  subscribeActiveDevice,
+  subscribeRegisteredDevices,
+} from "./state/devices";
+import {
+  getDefaultDeviceData,
+  getDeviceData,
+  updateDeviceData,
+} from "./state/device-data";
 
 type GaiaPacketEvent = {
   vendor_id: number;
@@ -158,6 +170,7 @@ export function initApp() {
   const pagePairing = el<HTMLDivElement>("#page-pairing");
   const pageLicenses = el<HTMLDivElement>("#page-licenses");
   const homeShell = pageHome;
+  const appTitle = el<HTMLDivElement>("#appTitle");
   const status = el<HTMLDivElement>("#status");
   const battery = el<HTMLDivElement>("#battery");
   const batteryIcon = el<HTMLSpanElement>("#batteryIcon");
@@ -165,17 +178,11 @@ export function initApp() {
   const lampToggle = el<HTMLInputElement>("#lampToggle");
   const lampBrightness = el<HTMLInputElement>("#lampBrightness");
   const lampHue = el<HTMLInputElement>("#lampHue");
-  let lastBatteryStep: number | null = null;
-  let lastDcState: number | null = null;
   let batteryTimer: ReturnType<typeof setInterval> | null = null;
   let volumeDebounce: ReturnType<typeof setTimeout> | null = null;
-  let lampBrightnessState: number | null = null;
-  let lampTypeState = 1;
-  let lampHueState = 0;
   let lampDebounce: ReturnType<typeof setTimeout> | null = null;
-  let lampLastNonZero = 50;
-  let lampOnState = false;
   let connectController: ReturnType<typeof initConnectController> | null = null;
+  let deviceSelectBinding: ReturnType<typeof bindSelect> | null = null;
 
   let currentPage: "home" | "dev" | "settings" | "connect" | "pairing" | "licenses" = "home";
   let isTransitioning = false;
@@ -283,6 +290,63 @@ export function initApp() {
     void invoke("log_line", { line, tone, ts: "" });
   }
 
+  function getActiveDeviceData() {
+    const address = getActiveDeviceAddress();
+    if (!address) return getDefaultDeviceData();
+    return getDeviceData(address);
+  }
+
+  function updateActiveDeviceData(patch: Partial<ReturnType<typeof getDeviceData>>) {
+    const address = getActiveDeviceAddress();
+    if (!address) return null;
+    return updateDeviceData(address, patch);
+  }
+
+  function isActiveDeviceConnected() {
+    const active = getActiveDeviceAddress();
+    const { state, address } = getConnectionSnapshot();
+    return !!active && state === "connected" && address === active;
+  }
+
+  function getActiveDeviceLabel() {
+    const address = getActiveDeviceAddress();
+    if (!address) return null;
+    const registered = getRegisteredDevices().find((device) => device.address === address);
+    return registered?.name ?? address;
+  }
+
+  function renderDeviceTitle() {
+    appTitle.setAttribute("data-tauri-drag-region", "false");
+    const devices = getRegisteredDevices();
+    if (devices.length === 0) {
+      appTitle.textContent = "STONE 매니저";
+      deviceSelectBinding = null;
+      return;
+    }
+    const active = getActiveDeviceAddress() ?? devices[0]?.address ?? null;
+    if (active && active !== getActiveDeviceAddress()) {
+      setActiveDeviceAddress(active);
+    }
+    appTitle.innerHTML = renderSelect({
+      id: "deviceSelect",
+      options: devices.map((device) => ({
+        value: device.address,
+        label: device.name ?? device.address,
+      })),
+      value: active ?? "",
+    });
+    deviceSelectBinding = bindSelect("deviceSelect", (value) => {
+      setActiveDeviceAddress(value);
+    });
+  }
+
+  function syncActiveDeviceUI() {
+    updateConnectionStatus();
+    updateBatteryLabel();
+    updateVolumeUI();
+    updateLampUI();
+  }
+
   connectController = initConnectController({
     logLine,
     getConnectionState: () => getConnectionSnapshot().state,
@@ -305,18 +369,16 @@ export function initApp() {
   function resetBatteryState() {
     battery.textContent = "--";
     batteryIcon.textContent = "battery_android_question";
-    lastBatteryStep = null;
-    lastDcState = null;
     void invoke("set_tray_battery", { percent: null, charging: false, full: false });
   }
 
   const lampTypeSelect = bindSelect("lampType", (value) => {
     const next = Number(value);
-    lampTypeState = next;
-    if (!lampOnState) return;
+    const data = updateActiveDeviceData({ lampType: next });
+    if (!data || !data.lampOn) return;
     setLampType(next).catch((err) => logLine(String(err), "SYS"));
     if (next === 1) {
-      setLampColor(lampHueState).catch((err) => logLine(String(err), "SYS"));
+      setLampColor(data.lampHue).catch((err) => logLine(String(err), "SYS"));
     }
   });
 
@@ -328,17 +390,18 @@ export function initApp() {
   }
 
   function updateLampUI() {
-    if (lampBrightnessState === null) {
+    const data = getActiveDeviceData();
+    if (data.lampBrightness === null) {
       lampBrightness.value = "0";
     } else {
-      lampBrightness.value = String(lampBrightnessState);
+      lampBrightness.value = String(data.lampBrightness);
     }
     updateRangeFill(lampBrightness);
-    lampToggle.checked = lampOnState;
-    lampTypeSelect?.setValue(lampTypeState);
-    lampHue.value = String(lampHueState);
+    lampToggle.checked = data.lampOn;
+    lampTypeSelect?.setValue(data.lampType);
+    lampHue.value = String(data.lampHue);
     updateRangeFill(lampHue);
-    setLampEnabled(getConnectionSnapshot().state === "connected");
+    setLampEnabled(isActiveDeviceConnected());
   }
 
   function sliderToRgb(value: number) {
@@ -417,10 +480,12 @@ export function initApp() {
     volumeSlider.disabled = !enabled;
   }
 
-  function updateVolumeUI(value: number | null) {
-    const v = (value === null || Number.isNaN(value)) ? 0 : value;
+  function updateVolumeUI() {
+    const data = getActiveDeviceData();
+    const v = (data.volume === null || Number.isNaN(data.volume)) ? 0 : data.volume;
     volumeSlider.value = String(v);
     updateRangeFill(volumeSlider);
+    setVolumeEnabled(isActiveDeviceConnected());
   }
 
   async function requestVolume() {
@@ -443,28 +508,27 @@ export function initApp() {
 
   function setConnected(address: string) {
     setConnectionState("connected", address);
+    setActiveDeviceAddress(address);
     requestBattery().catch((err) => logLine(String(err), "SYS"));
     requestVolume().catch((err) => logLine(String(err), "SYS"));
     requestLampState().catch((err) => logLine(String(err), "SYS"));
     stopBatteryPolling();
     batteryTimer = setInterval(requestBattery, 30_000);
-    setVolumeEnabled(true);
-    setLampEnabled(true);
+    updateVolumeUI();
+    updateLampUI();
   }
 
   function setDisconnected() {
     stopBatteryPolling();
     resetBatteryState();
-    updateVolumeUI(null);
-    setVolumeEnabled(false);
-    lampBrightnessState = null;
-    lampOnState = false;
+    updateVolumeUI();
     updateLampUI();
     setConnectionState("idle", null);
   }
 
   function updateConnectionStatus() {
     const { state, address } = getConnectionSnapshot();
+    const active = getActiveDeviceAddress();
     switch (state) {
       case "connecting":
         status.textContent = "연결 중...";
@@ -475,6 +539,11 @@ export function initApp() {
         status.classList.remove("connected");
         break;
       case "connected": {
+        if (active && address !== active) {
+          status.textContent = `${getActiveDeviceLabel() ?? "STONE"}이 연결되지 않음`;
+          status.classList.remove("connected");
+          break;
+        }
         const label = address
           ? connectController?.getDeviceLabel(address) ?? address
           : "Unknown";
@@ -484,7 +553,7 @@ export function initApp() {
       }
       case "idle":
       default:
-        status.textContent = "STONE이 연결되지 않음";
+        status.textContent = `${getActiveDeviceLabel() ?? "STONE"}이 연결되지 않음`;
         status.classList.remove("connected");
         break;
     }
@@ -507,14 +576,21 @@ export function initApp() {
   }
 
   function updateBatteryLabel() {
-    if (lastBatteryStep === null) {
+    if (!isActiveDeviceConnected()) {
+      battery.textContent = "--";
+      batteryIcon.textContent = "battery_android_question";
+      void invoke("set_tray_battery", { percent: null, charging: false, full: false });
+      return;
+    }
+    const { batteryStep, dcState } = getActiveDeviceData();
+    if (batteryStep === null) {
       battery.textContent = "--";
       batteryIcon.textContent = "battery_android_question";
       void invoke("set_tray_battery", { percent: null, charging: false, full: false });
       return;
     }
     let percent: number;
-    switch (lastBatteryStep) {
+    switch (batteryStep) {
       case 0:
       case 1:
         percent = 20;
@@ -532,12 +608,12 @@ export function initApp() {
         percent = 100;
         break;
       default:
-        percent = lastBatteryStep;
+        percent = batteryStep;
         break;
     }
     let suffix = "";
-    const isFull = lastDcState === 1 && lastBatteryStep === 5;
-    const isCharging = lastDcState === 3;
+    const isFull = dcState === 1 && batteryStep === 5;
+    const isCharging = dcState === 3;
     let icon = "battery_android_question";
 
     if (isCharging) {
@@ -642,34 +718,40 @@ export function initApp() {
   });
   loadAppVersion().catch(() => {});
   battery.addEventListener("click", requestBattery);
-  setVolumeEnabled(false);
-  updateVolumeUI(null);
+  updateVolumeUI();
   updateLampUI();
   volumeSlider.addEventListener("input", () => {
     if (volumeSlider.disabled) return;
     const value = Number(volumeSlider.value);
-    updateVolumeUI(value);
+    updateActiveDeviceData({ volume: value });
+    updateVolumeUI();
     if (volumeDebounce) {
       clearTimeout(volumeDebounce);
     }
     volumeDebounce = setTimeout(() => {
+      if (!isActiveDeviceConnected()) return;
       setVolume(value);
     }, 150);
   });
   lampToggle.addEventListener("change", () => {
     if (lampToggle.disabled) return;
-    const current = lampBrightnessState ?? 0;
+    const currentData = getActiveDeviceData();
+    const current = currentData.lampBrightness ?? 0;
     const nextValue = lampToggle.checked
-      ? (current > 0 ? current : lampLastNonZero)
+      ? (current > 0 ? current : currentData.lampLastNonZero)
       : 0;
-    lampBrightnessState = nextValue;
+    const updated = updateActiveDeviceData({
+      lampBrightness: nextValue,
+      lampOn: lampToggle.checked,
+      lampLastNonZero: nextValue > 0 ? nextValue : currentData.lampLastNonZero,
+    });
     if (nextValue > 0) {
-      lampLastNonZero = nextValue;
+      updateActiveDeviceData({ lampLastNonZero: nextValue });
     }
-    lampOnState = lampToggle.checked;
     updateLampUI();
-    if (lampOnState) {
-      runLamp(nextValue, lampTypeState, lampHueState).catch((err) => logLine(String(err), "SYS"));
+    if (!updated || !isActiveDeviceConnected()) return;
+    if (updated.lampOn) {
+      runLamp(nextValue, updated.lampType, updated.lampHue).catch((err) => logLine(String(err), "SYS"));
     } else {
       stopLamp().catch((err) => logLine(String(err), "SYS"));
     }
@@ -677,27 +759,31 @@ export function initApp() {
   lampBrightness.addEventListener("input", () => {
     if (lampBrightness.disabled) return;
     const value = Number(lampBrightness.value);
-    lampBrightnessState = value;
+    const updated = updateActiveDeviceData({
+      lampBrightness: value,
+      lampLastNonZero: value > 0 ? value : getActiveDeviceData().lampLastNonZero,
+    });
     if (value > 0) {
-      lampLastNonZero = value;
+      updateActiveDeviceData({ lampLastNonZero: value });
     }
     updateLampUI();
     if (lampDebounce) {
       clearTimeout(lampDebounce);
     }
     lampDebounce = setTimeout(() => {
-      if (!lampOnState) return;
+      if (!updated || !updated.lampOn || !isActiveDeviceConnected()) return;
       setLampBrightness(value).catch((err) => logLine(String(err), "SYS"));
     }, 150);
     updateRangeFill(lampBrightness);
   });
   lampHue.addEventListener("input", () => {
     if (lampHue.disabled) return;
-    lampHueState = Number(lampHue.value);
+    const nextHue = Number(lampHue.value);
+    const updated = updateActiveDeviceData({ lampHue: nextHue });
     updateRangeFill(lampHue);
-    if (!lampOnState) return;
-    if (lampTypeState === 1) {
-      setLampColor(lampHueState).catch((err) => logLine(String(err), "SYS"));
+    if (!updated || !updated.lampOn || !isActiveDeviceConnected()) return;
+    if (updated.lampType === 1) {
+      setLampColor(updated.lampHue).catch((err) => logLine(String(err), "SYS"));
     }
   });
   bindSettingsPage(() => {
@@ -739,6 +825,16 @@ export function initApp() {
     });
   });
 
+  renderDeviceTitle();
+  syncActiveDeviceUI();
+  subscribeRegisteredDevices(() => {
+    renderDeviceTitle();
+    syncActiveDeviceUI();
+  });
+  subscribeActiveDevice(() => {
+    renderDeviceTitle();
+    syncActiveDeviceUI();
+  });
 
   listen<ConnectResultEvent>("bt_connect_result", (event: Event<ConnectResultEvent>) => {
     connectController.handleConnectResult(event.payload);
@@ -751,10 +847,15 @@ export function initApp() {
   listen<GaiaPacketEvent>("gaia_packet", (event: Event<GaiaPacketEvent>) => {
     const p = event.payload;
     const dataPayload = p.ack && p.payload.length > 0 ? p.payload.slice(1) : p.payload;
+    const connectedAddress = getConnectionSnapshot().address;
     if (p.vendor_id === 0x5054 && p.command === 0x0455 && p.ack) {
       if (dataPayload.length >= 1) {
-        lastBatteryStep = dataPayload[0];
-        updateBatteryLabel();
+        if (connectedAddress) {
+          updateDeviceData(connectedAddress, { batteryStep: dataPayload[0] });
+        }
+        if (connectedAddress && connectedAddress === getActiveDeviceAddress()) {
+          updateBatteryLabel();
+        }
       }
     }
     if (p.vendor_id === 0x5054 && p.command === 0x0451 && p.ack) {
@@ -782,27 +883,44 @@ export function initApp() {
     }
     if (p.vendor_id === 0x5054 && p.command === 0x0456 && p.ack) {
       if (dataPayload.length >= 1) {
-        lastDcState = dataPayload[0];
-        updateBatteryLabel();
+        if (connectedAddress) {
+          updateDeviceData(connectedAddress, { dcState: dataPayload[0] });
+        }
+        if (connectedAddress && connectedAddress === getActiveDeviceAddress()) {
+          updateBatteryLabel();
+        }
       }
     }
     if (p.vendor_id === 0x5054 && p.command === 0x0401 && p.ack) {
       if (dataPayload.length >= 1) {
-        updateVolumeUI(dataPayload[0]);
+        if (connectedAddress) {
+          updateDeviceData(connectedAddress, { volume: dataPayload[0] });
+        }
+        if (connectedAddress && connectedAddress === getActiveDeviceAddress()) {
+          updateVolumeUI();
+        }
       }
     }
     if (p.vendor_id === 0x5054 && p.command === 0x0411 && p.ack) {
       if (dataPayload.length >= 6) {
-        lampOnState = dataPayload[0] === 1;
-        lampBrightnessState = dataPayload[1];
+        const lampOn = dataPayload[0] === 1;
+        const lampBrightness = dataPayload[1];
         const type = dataPayload[2];
-        lampTypeState = type >= 1 && type <= 5 ? type : 1;
+        const lampType = type >= 1 && type <= 5 ? type : 1;
         const [r, g, b] = dataPayload.slice(3, 6);
-        lampHueState = rgbToSlider(r, g, b);
-        if (lampBrightnessState > 0) {
-          lampLastNonZero = lampBrightnessState;
+        const lampHue = rgbToSlider(r, g, b);
+        if (connectedAddress) {
+          updateDeviceData(connectedAddress, {
+            lampOn,
+            lampBrightness,
+            lampType,
+            lampHue,
+            lampLastNonZero: lampBrightness > 0 ? lampBrightness : getDeviceData(connectedAddress).lampLastNonZero,
+          });
         }
-        updateLampUI();
+        if (connectedAddress && connectedAddress === getActiveDeviceAddress()) {
+          updateLampUI();
+        }
       }
     }
     const payloadText = p.payload.length
