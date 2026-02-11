@@ -172,7 +172,7 @@ static void runOnMainSync(void (^block)(void)) {
     [self ensureConnectionNotifications];
     if (self.device && address.length > 0) {
         if ([self.device.addressString caseInsensitiveCompare:address] != NSOrderedSame) {
-            if (![self disconnectWithTimeout:4.0]) {
+            if (![self disconnectWithTimeout:3.0]) {
                 self.lastErrorContext = @"disconnect_timeout";
                 BTLOG(@"Disconnect timeout before connect");
                 return kIOReturnBusy;
@@ -201,9 +201,49 @@ static void runOnMainSync(void (^block)(void)) {
     }
 
     BOOL wasConnected = [device isConnected];
+
     if (wasConnected) {
-        self.lastErrorContext = @"already_connected";
         BTLOG(@"Already connected: %@", device.addressString);
+
+        self.lastErrorContext = @"sdp_query_reuse";
+        IOReturn sdpReuse = [device performSDPQuery:nil];
+        BTLOG(@"SDP query (reuse): status=%d", (int)sdpReuse);
+
+        BluetoothRFCOMMChannelID reuseCh = 0;
+        NSDate *reuseDeadline = [NSDate dateWithTimeIntervalSinceNow:3.0];
+        while ([reuseDeadline timeIntervalSinceNow] > 0) {
+            reuseCh = [self resolveRFCOMMChannel:device];
+            if (reuseCh != 0) {
+                break;
+            }
+            [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
+                                     beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
+        }
+
+        if (reuseCh != 0) {
+            BTLOG(@"GAIA channel (reuse): %d", (int)reuseCh);
+            self.lastErrorContext = @"open_rfcomm_reuse";
+            BTLOG(@"Open RFCOMM (reuse): ch=%d", (int)reuseCh);
+            IOReturn reuseStatus = [self openRFCOMMChannelAndWait:device channelID:reuseCh timeout:3.0];
+            if (reuseStatus == kIOReturnSuccess) {
+                self.lastErrorContext = @"connected";
+                BTLOG(@"RFCOMM connected (reuse): ch=%d", (int)reuseCh);
+                return kIOReturnSuccess;
+            }
+            BTLOG(@"RFCOMM reuse failed: ch=%d status=%d — will close and reconnect", (int)reuseCh, (int)reuseStatus);
+        } else {
+            BTLOG(@"GAIA channel (reuse): NOT FOUND — will close and reconnect");
+        }
+
+        BTLOG(@"Closing stale connection: %@", device.addressString);
+        [device closeConnection];
+        BOOL down = [self waitForDevice:device connected:NO timeout:3.0];
+        BTLOG(@"Stale link closed: %@ (%@)", down ? @"YES" : @"NO", device.addressString);
+        if (!down) {
+            self.lastErrorContext = @"stale_disconnect_timeout";
+            BTLOG(@"Stale disconnect timeout: %@", device.addressString);
+            return kIOReturnBusy;
+        }
     }
 
     self.lastErrorContext = @"open_connection";
@@ -238,7 +278,7 @@ static void runOnMainSync(void (^block)(void)) {
 
     self.lastErrorContext = @"open_rfcomm";
     BTLOG(@"Open RFCOMM: ch=%d", (int)resolved);
-    IOReturn status = [self openRFCOMMChannelAndWait:device channelID:resolved timeout:4.0];
+    IOReturn status = [self openRFCOMMChannelAndWait:device channelID:resolved timeout:3.0];
     if (status == kIOReturnSuccess) {
         self.lastErrorContext = @"connected";
         BTLOG(@"RFCOMM connected: ch=%d", (int)resolved);
@@ -252,7 +292,7 @@ static void runOnMainSync(void (^block)(void)) {
 }
 
 - (void)disconnect {
-    [self disconnectWithTimeout:2.0];
+    [self disconnectWithTimeout:3.0];
     self.device = nil;
 }
 
