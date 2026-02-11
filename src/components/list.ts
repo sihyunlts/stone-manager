@@ -8,6 +8,7 @@ type ListItemOptions = {
   className?: string;
   id?: string;
   link?: { url: string };
+  data?: Record<string, string>;
 };
 
 export function renderList(items: string[]) {
@@ -15,7 +16,7 @@ export function renderList(items: string[]) {
 }
 
 export function renderListItem(options: ListItemOptions) {
-  const { label, value, valueId, right, body, col, className, id, link } = options;
+  const { label, value, valueId, right, body, col, className, id, link, data } = options;
   const isCol = Boolean(col || body);
   const labelMarkup = label ? `<div class="list-label">${label}</div>` : "";
   const rowMarkup = right
@@ -31,6 +32,11 @@ export function renderListItem(options: ListItemOptions) {
     .join(" ");
   const idAttr = id ? ` id="${id}"` : "";
   const dataAttrs = link ? ` data-url="${link.url}"` : "";
+  const extraData = data
+    ? Object.entries(data)
+        .map(([key, val]) => ` data-${key}="${val}"`)
+        .join("")
+    : "";
   const valueContent = value ?? "--";
   const valueMarkup =
     valueId !== undefined
@@ -40,7 +46,7 @@ export function renderListItem(options: ListItemOptions) {
         : "";
   const bodyMarkup = body ? `<div class="list-body">${body}</div>` : "";
   return `
-    <div class="${classes}"${idAttr}${dataAttrs}>
+    <div class="${classes}"${idAttr}${dataAttrs}${extraData}>
       ${rowMarkup}
       ${valueMarkup}
       ${bodyMarkup}

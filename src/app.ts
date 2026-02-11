@@ -3,7 +3,13 @@ import { getVersion } from "@tauri-apps/api/app";
 import { listen, type Event } from "@tauri-apps/api/event";
 import { bindDevPage, renderDevPage } from "./dev";
 import { bindSettingsPage, renderSettingsPage } from "./settings";
-import { renderConnectPage } from "./connect";
+import {
+  initConnectController,
+  renderConnectPage,
+  type ConnectionState,
+  type ConnectResultEvent,
+  type DeviceStateEvent,
+} from "./connect";
 import { renderPairingPage } from "./pairing";
 import { renderLicensesPage } from "./licenses";
 import { renderHeader } from "./components/header";
@@ -24,39 +30,6 @@ type GaiaPacketEvent = {
   payload: number[];
   status?: number | null;
 };
-
-type ConnectResultEvent = {
-  address: string;
-  ok: boolean;
-  error?: string | null;
-};
-
-type DeviceStateEvent = {
-  address: string;
-  connected: boolean;
-};
-
-type ConnectionInfo = {
-  address: string;
-  link: boolean;
-  rfcomm: boolean;
-};
-
-type DeviceInfo = {
-  name: string;
-  address: string;
-  connected: boolean;
-  alias?: string | null;
-  raw_name?: string | null;
-};
-
-type ConnectionState = "idle" | "connecting" | "connected" | "disconnecting";
-type PairedDevice = {
-  address: string;
-  name: string;
-};
-
-const PAIRED_STORAGE_KEY = "stone_paired_devices";
 
 function el<T extends HTMLElement>(selector: string): T {
   const node = document.querySelector(selector);
@@ -170,9 +143,9 @@ export function initApp() {
   `;
 
   const navBackButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-back"));
+  const navSidebarButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-sidebar"));
   const navConnect = el<HTMLButtonElement>("#navConnect");
   const navSettings = el<HTMLButtonElement>("#navSettings");
-  const navPairing = el<HTMLButtonElement>("#navPairing");
   const pageHost = el<HTMLDivElement>("#pageHost");
   const pageHome = el<HTMLDivElement>("#page-home");
   const pageDev = el<HTMLDivElement>("#page-dev");
@@ -180,6 +153,7 @@ export function initApp() {
   const pageConnect = el<HTMLDivElement>("#page-connect");
   const pagePairing = el<HTMLDivElement>("#page-pairing");
   const pageLicenses = el<HTMLDivElement>("#page-licenses");
+  const homeShell = pageHome;
   const status = el<HTMLDivElement>("#status");
   const battery = el<HTMLDivElement>("#battery");
   const batteryIcon = el<HTMLSpanElement>("#batteryIcon");
@@ -187,15 +161,8 @@ export function initApp() {
   const lampToggle = el<HTMLInputElement>("#lampToggle");
   const lampBrightness = el<HTMLInputElement>("#lampBrightness");
   const lampHue = el<HTMLInputElement>("#lampHue");
-  let registerSelected = "";
-  let registeredSelected = "";
-  const registerButton = el<HTMLButtonElement>("#registerDevice");
-  const removeButton = el<HTMLButtonElement>("#removeRegistered");
-  let devices: DeviceInfo[] = [];
-  let pairedDevices = loadPairedDevices();
   let connectionState: ConnectionState = "idle";
   let connectedAddress: string | null = null;
-  let registerPending: string | null = null;
   let lastBatteryStep: number | null = null;
   let lastDcState: number | null = null;
   let batteryTimer: ReturnType<typeof setInterval> | null = null;
@@ -206,6 +173,7 @@ export function initApp() {
   let lampDebounce: ReturnType<typeof setTimeout> | null = null;
   let lampLastNonZero = 50;
   let lampOnState = false;
+  let connectController: ReturnType<typeof initConnectController> | null = null;
 
   let currentPage: "home" | "dev" | "settings" | "connect" | "pairing" | "licenses" = "home";
   let isTransitioning = false;
@@ -313,47 +281,17 @@ export function initApp() {
     void invoke("log_line", { line, tone, ts: "" });
   }
 
+  connectController = initConnectController({
+    logLine,
+    getConnectionState: () => connectionState,
+    getConnectedAddress: () => connectedAddress,
+    setConnectionState,
+    setConnected,
+    setDisconnected,
+    goToPairing: () => goTo("pairing"),
+  });
 
-  function getDeviceLabel(address: string) {
-    const device = devices.find((d) => d.address === address);
-    if (device?.name) return device.name;
-    const paired = pairedDevices.find((d) => d.address === address);
-    return paired?.name ?? address;
-  }
 
-  function loadPairedDevices(): PairedDevice[] {
-    try {
-      const raw = localStorage.getItem(PAIRED_STORAGE_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      return parsed
-        .filter((entry) => entry && typeof entry.address === "string")
-        .map((entry) => ({
-          address: entry.address,
-          name: typeof entry.name === "string" ? entry.name : entry.address,
-        }));
-    } catch {
-      return [];
-    }
-  }
-
-  function savePairedDevices(list: PairedDevice[]) {
-    localStorage.setItem(PAIRED_STORAGE_KEY, JSON.stringify(list));
-  }
-
-  function upsertPairedDevice(address: string) {
-    if (!address) return;
-    const latestName = devices.find((d) => d.address === address)?.name ?? address;
-    const existing = pairedDevices.findIndex((d) => d.address === address);
-    if (existing >= 0) {
-      pairedDevices[existing].name = latestName;
-    } else {
-      pairedDevices.unshift({ address, name: latestName });
-    }
-    savePairedDevices(pairedDevices);
-    renderRegisteredList();
-  }
 
   function stopBatteryPolling() {
     if (batteryTimer) {
@@ -378,14 +316,6 @@ export function initApp() {
     if (next === 1) {
       setLampColor(lampHueState).catch((err) => logLine(String(err), "SYS"));
     }
-  });
-
-  const registerListSelect = bindSelect("registerList", (value) => {
-    registerSelected = value;
-  });
-
-  const registeredListSelect = bindSelect("registeredList", (value) => {
-    registeredSelected = value;
   });
 
   function setLampEnabled(enabled: boolean) {
@@ -542,7 +472,9 @@ export function initApp() {
         status.classList.remove("connected");
         break;
       case "connected": {
-        const label = connectedAddress ? getDeviceLabel(connectedAddress) : "Unknown";
+        const label = connectedAddress
+          ? connectController?.getDeviceLabel(connectedAddress) ?? connectedAddress
+          : "Unknown";
         status.textContent = `${label}`;
         status.classList.add("connected");
         break;
@@ -559,161 +491,6 @@ export function initApp() {
     connectionState = state;
     connectedAddress = address;
     updateConnectionStatus();
-  }
-
-  function renderRegisterList() {
-    const previous = registerSelected;
-    const connectedDevices = devices.filter((d) => d.connected);
-    if (connectedDevices.length === 0) {
-      registerSelected = "";
-      registerListSelect?.setOptions([{ value: "", label: "연결된 기기가 없습니다." }], "");
-      registerListSelect?.setEnabled(false);
-      return;
-    }
-
-    registerListSelect?.setEnabled(true);
-    const options = connectedDevices.map((device) => {
-      const alias = device.alias ?? "";
-      const raw = device.raw_name ?? "";
-      const label = alias && raw && alias !== raw ? `${alias} (name: ${raw})` : device.name;
-      return { value: device.address, label: `${label} (${device.address})` };
-    });
-    if (previous && connectedDevices.some((d) => d.address === previous)) {
-      registerSelected = previous;
-      registerListSelect?.setOptions(options, previous);
-      return;
-    }
-    const preferred = connectedDevices.find((d) => d.name.toUpperCase().includes("STONE"));
-    if (preferred) {
-      registerSelected = preferred.address;
-      registerListSelect?.setOptions(options, preferred.address);
-      return;
-    }
-    if (connectedDevices[0]) {
-      registerSelected = connectedDevices[0].address;
-      registerListSelect?.setOptions(options, connectedDevices[0].address);
-    }
-  }
-
-  function renderRegisteredList() {
-    const previous = registeredSelected;
-    if (pairedDevices.length === 0) {
-      registeredSelected = "";
-      registeredListSelect?.setOptions([{ value: "", label: "등록된 기기가 없습니다." }], "");
-      registeredListSelect?.setEnabled(false);
-      return;
-    }
-
-    registeredListSelect?.setEnabled(true);
-    const options = pairedDevices.map((paired) => {
-      const device = devices.find((d) => d.address === paired.address);
-      const status = device?.connected ? "connected" : device ? "paired" : "saved";
-      const name = device?.name ?? paired.name ?? paired.address;
-      return { value: paired.address, label: `${name} (${paired.address}) · ${status}` };
-    });
-
-    if (previous && pairedDevices.some((d) => d.address === previous)) {
-      registeredSelected = previous;
-      registeredListSelect?.setOptions(options, previous);
-      return;
-    }
-    if (connectedAddress && pairedDevices.some((d) => d.address === connectedAddress)) {
-      registeredSelected = connectedAddress;
-      registeredListSelect?.setOptions(options, connectedAddress);
-      return;
-    }
-    if (pairedDevices[0]) {
-      registeredSelected = pairedDevices[0].address;
-      registeredListSelect?.setOptions(options, pairedDevices[0].address);
-    }
-  }
-
-  function removePairedDevice(address: string) {
-    if (!address) return;
-    pairedDevices = pairedDevices.filter((d) => d.address !== address);
-    savePairedDevices(pairedDevices);
-    renderRegisteredList();
-  }
-
-  async function refreshDevices() {
-    devices = (await invoke<DeviceInfo[]>("list_devices")) ?? [];
-    renderRegisterList();
-    renderRegisteredList();
-  }
-
-  async function syncBackendConnection() {
-    try {
-      const info = await invoke<ConnectionInfo>("get_connection_info");
-      if (info.rfcomm && info.address) {
-        setConnected(info.address);
-        upsertPairedDevice(info.address);
-      } else if (connectionState === "connected") {
-        setDisconnected();
-      }
-    } catch (err) {
-      logLine(String(err), "SYS");
-    }
-  }
-
-  async function connect() {
-    const address = registeredSelected;
-    if (!address) {
-      logLine("Select a device first", "SYS");
-      return;
-    }
-    if (connectionState === "connecting" || connectionState === "disconnecting") {
-      logLine("Connect already in progress", "SYS");
-      return;
-    }
-    if (connectionState === "connected" && connectedAddress === address) {
-      logLine("Already connected", "SYS");
-      return;
-    }
-    try {
-      setConnectionState("connecting", address);
-      await invoke("connect_device_async", { address });
-    } catch (err) {
-      logLine(String(err), "SYS");
-      setConnectionState("idle", null);
-    }
-  }
-
-  async function registerDevice() {
-    const address = registerSelected;
-    if (!address) {
-      logLine("Select a device to register", "SYS");
-      return;
-    }
-    if (connectionState === "connecting" || connectionState === "disconnecting") {
-      logLine("Connect already in progress", "SYS");
-      return;
-    }
-    if (connectionState === "connected" && connectedAddress === address) {
-      upsertPairedDevice(address);
-      logLine(`Registered ${getDeviceLabel(address)}`, "SYS");
-      return;
-    }
-    try {
-      registerPending = address;
-      setConnectionState("connecting", address);
-      await invoke("connect_device_async", { address });
-    } catch (err) {
-      registerPending = null;
-      logLine(String(err), "SYS");
-      setConnectionState("idle", null);
-    }
-  }
-
-  async function disconnect() {
-    try {
-      setConnectionState("disconnecting", connectedAddress);
-      await invoke("disconnect_device");
-      setDisconnected();
-      logLine("Disconnected", "SYS");
-    } catch (err) {
-      logLine(String(err), "SYS");
-      setConnectionState("idle", connectedAddress);
-    }
   }
 
   async function requestBattery() {
@@ -808,9 +585,6 @@ export function initApp() {
     }
   }
 
-  el<HTMLButtonElement>("#refreshDevices").addEventListener("click", refreshDevices);
-  el<HTMLButtonElement>("#connect").addEventListener("click", connect);
-  el<HTMLButtonElement>("#disconnect").addEventListener("click", disconnect);
   const devInfoName = document.querySelector<HTMLDivElement>("#devInfoName");
   const devInfoFirmware = document.querySelector<HTMLDivElement>("#devInfoFirmware");
   const devInfoMac = document.querySelector<HTMLDivElement>("#devInfoMac");
@@ -923,7 +697,6 @@ export function initApp() {
       setLampColor(lampHueState).catch((err) => logLine(String(err), "SYS"));
     }
   });
-  registerButton.addEventListener("click", registerDevice);
   bindSettingsPage(() => {
     logLine("Developer menu unlocked", "SYS");
     goTo("dev");
@@ -933,9 +706,6 @@ export function initApp() {
   });
   navConnect.addEventListener("click", () => {
     goTo("connect");
-  });
-  navPairing.addEventListener("click", () => {
-    goTo("pairing");
   });
   const navLicenses = el<HTMLDivElement>("#navLicenses");
   if (navLicenses) {
@@ -959,57 +729,20 @@ export function initApp() {
       goBack();
     });
   });
-  removeButton.addEventListener("click", () => {
-    const address = registeredSelected;
-    if (!address) {
-      logLine("Select a device to remove", "SYS");
-      return;
-    }
-    removePairedDevice(address);
-    logLine(`Removed ${getDeviceLabel(address)}`, "SYS");
+
+  navSidebarButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      homeShell.classList.toggle("is-sidebar-collapsed");
+    });
   });
 
+
   listen<ConnectResultEvent>("bt_connect_result", (event: Event<ConnectResultEvent>) => {
-    const result = event.payload;
-    const device = devices.find((d) => d.address === result.address);
-    if (result.ok) {
-      setConnected(result.address);
-      upsertPairedDevice(result.address);
-      if (registerPending === result.address) {
-        logLine(`Registered ${device?.name ?? result.address}`, "SYS");
-        registerPending = null;
-      }
-      logLine(`Connected to ${device?.name ?? result.address}`, "SYS");
-    } else {
-      if (registerPending === result.address) {
-        logLine(result.error ?? "Register failed", "SYS");
-        registerPending = null;
-      }
-      if (connectedAddress === result.address) {
-        setDisconnected();
-      } else {
-        setConnectionState("idle", connectedAddress);
-      }
-      logLine(result.error ?? "Connect failed", "SYS");
-    }
+    connectController.handleConnectResult(event.payload);
   });
 
   listen<DeviceStateEvent>("bt_device_event", (event: Event<DeviceStateEvent>) => {
-    const { address, connected } = event.payload;
-    const target = devices.find((d) => d.address === address);
-    if (target) {
-      target.connected = connected;
-      renderRegisterList();
-      renderRegisteredList();
-    } else {
-      refreshDevices().catch((err) => logLine(String(err), "SYS"));
-    }
-    if (connectedAddress === address && !connected) {
-      if (connectionState === "connecting") {
-        return;
-      }
-      setDisconnected();
-    }
+    connectController.handleDeviceEvent(event.payload);
   });
 
   listen<GaiaPacketEvent>("gaia_packet", (event: Event<GaiaPacketEvent>) => {
@@ -1079,7 +812,8 @@ export function initApp() {
     );
   });
 
-  refreshDevices()
-    .then(syncBackendConnection)
+  connectController
+    ?.refreshDevices()
+    .then(() => connectController?.syncBackendConnection())
     .catch((err) => logLine(String(err), "SYS"));
 }

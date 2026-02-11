@@ -115,6 +115,14 @@ body {
   min-width: 0;
 }
 
+.device-item.is-selected {
+  background: rgba(188, 199, 255, 0.15);
+}
+
+.device-item-empty {
+  color: var(--muted);
+}
+
 .status {
   color: var(--muted);
   font-weight: 500;

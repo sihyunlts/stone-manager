@@ -1,16 +1,22 @@
 import { renderHeader } from "./components/header";
 import { renderSection } from "./components/section";
-import { renderSelect } from "./components/select";
+import { renderList, renderListItem } from "./components/list";
 
 export function renderPairingPage() {
   const registerSection = renderSection({
     title: "기기 등록",
     body: `
-      <div class="card">
-        <div class="row">
-          ${renderSelect({ id: "registerList", options: [] })}
-          <button id="registerDevice">등록</button>
-        </div>
+      <div id="registerList">
+        ${renderList([
+          renderListItem({
+            label: "연결된 기기가 없습니다.",
+            value: "",
+            className: "device-item-empty",
+          }),
+        ])}
+      </div>
+      <div class="row">
+        <button id="registerDevice">등록</button>
       </div>
     `,
   });
