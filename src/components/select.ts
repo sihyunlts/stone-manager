@@ -1,6 +1,7 @@
 type SelectOption = {
   value: string | number;
   label: string;
+  icon?: string;
 };
 
 type SelectOptions = {
@@ -24,7 +25,12 @@ export function renderSelect(options: SelectOptions) {
   const optionsMarkup = items
     .map((item) => {
       const selected = String(item.value) === currentValue ? " is-selected" : "";
-      return `<div class="select-option${selected}" data-value="${item.value}">${item.label}</div>`;
+      return `
+        <div class="select-option${selected}" data-value="${item.value}">
+          ${item.icon ? `<span class="material-symbols-rounded select-option-icon">${item.icon}</span>` : ""}
+          <span class="select-option-label">${item.label}</span>
+        </div>
+      `;
     })
     .join("");
   return `
@@ -54,7 +60,8 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
     const option = options.find((item) => item.dataset.value === nextValue);
     if (option) {
       const labelEl = trigger!.querySelector(".select-label");
-      if (labelEl) labelEl.textContent = option.textContent ?? "";
+      const optionLabelEl = option.querySelector(".select-option-label");
+      if (labelEl && optionLabelEl) labelEl.textContent = optionLabelEl.textContent ?? "";
       options.forEach((item) => item.classList.toggle("is-selected", item === option));
     }
     if (emit) onChange(nextValue);
@@ -79,7 +86,12 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
     const optionsMarkup = items
       .map((item) => {
         const selected = String(item.value) === currentValue ? " is-selected" : "";
-        return `<div class="select-option${selected}" data-value="${item.value}">${item.label}</div>`;
+        return `
+          <div class="select-option${selected}" data-value="${item.value}">
+            ${item.icon ? `<span class="material-symbols-rounded select-option-icon">${item.icon}</span>` : ""}
+            <span class="select-option-label">${item.label}</span>
+          </div>
+        `;
       })
       .join("");
     menu!.innerHTML = optionsMarkup;

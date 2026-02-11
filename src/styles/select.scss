@@ -53,6 +53,15 @@
     color: var(--ink);
     cursor: pointer;
     position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    .select-option-icon {
+      line-height: 15px;
+      font-size: 20px;
+      color: var(--muted);
+    }
 
     &:not(:last-child)::after {
       content: "";
