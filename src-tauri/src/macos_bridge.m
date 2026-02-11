@@ -143,33 +143,18 @@ static void runOnMainSync(void (^block)(void)) {
 - (IOReturn)openRFCOMMChannelAndWait:(IOBluetoothDevice *)device
                            channelID:(BluetoothRFCOMMChannelID)channelID
                              timeout:(NSTimeInterval)timeout {
-    __block IOReturn startStatus = kIOReturnError;
-    __block dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+    (void)timeout;
+    __block IOReturn status = kIOReturnError;
     __block IOBluetoothRFCOMMChannel *openedChannel = nil;
-    __block IOReturn openStatus = kIOReturnError;
 
     runOnMainSync(^{
-        startStatus = [device openRFCOMMChannelAsync:&openedChannel withChannelID:channelID delegate:self];
-        if (startStatus != kIOReturnSuccess) {
-            dispatch_semaphore_signal(sema);
-        } else {
-            objc_setAssociatedObject(self, @"stone_rfcomm_sema", (id)sema, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        status = [device openRFCOMMChannelSync:&openedChannel withChannelID:channelID delegate:self];
+        if (status == kIOReturnSuccess) {
+            self.channel = openedChannel;
         }
     });
 
-    dispatch_time_t waitTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(timeout * NSEC_PER_SEC));
-    if (dispatch_semaphore_wait(sema, waitTime) != 0) {
-        return kIOReturnTimeout;
-    }
-
-    NSNumber *statusObj = objc_getAssociatedObject(self, @"stone_rfcomm_status");
-    if (statusObj) {
-        openStatus = (IOReturn)statusObj.intValue;
-    } else if (startStatus != kIOReturnSuccess) {
-        openStatus = startStatus;
-    }
-
-    return openStatus;
+    return status;
 }
 
 - (BluetoothRFCOMMChannelID)resolveRFCOMMChannel:(IOBluetoothDevice *)device {
@@ -216,18 +201,6 @@ static void runOnMainSync(void (^block)(void)) {
     }
 
     BOOL wasConnected = [device isConnected];
-    if (wasConnected && !self.channel) {
-        self.lastErrorContext = @"preconnect_link_reset";
-        BTLOG(@"Resetting existing link before connect: %@", device.addressString);
-        [device closeConnection];
-        BOOL down = [self waitForDevice:device connected:NO timeout:4.0];
-        BTLOG(@"Pre-connect disconnect: %@", down ? @"YES" : @"NO");
-        if (!down) {
-            self.lastErrorContext = @"disconnect_timeout";
-            return kIOReturnBusy;
-        }
-        wasConnected = [device isConnected];
-    }
     if (wasConnected) {
         self.lastErrorContext = @"already_connected";
         BTLOG(@"Already connected: %@", device.addressString);
