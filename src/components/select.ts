@@ -109,15 +109,19 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
       menu.style.left = "";
       menu.style.right = "";
       requestAnimationFrame(() => {
+        const container = root.closest<HTMLElement>(".layout");
+        const containerRect = container?.getBoundingClientRect();
         const menuRect = menu.getBoundingClientRect();
-        const overflowRight = menuRect.right > window.innerWidth - 8;
-        const overflowLeft = menuRect.left < 8;
-        if (overflowRight && !overflowLeft) {
-          menu.style.left = "auto";
-          menu.style.right = "0";
-        } else if (overflowLeft && !overflowRight) {
-          menu.style.left = "0";
-          menu.style.right = "auto";
+        if (containerRect) {
+          const overflowRight = menuRect.right > containerRect.right - 8;
+          const overflowLeft = menuRect.left < containerRect.left + 8;
+          if (overflowRight && !overflowLeft) {
+            menu.style.left = "auto";
+            menu.style.right = "0";
+          } else if (overflowLeft && !overflowRight) {
+            menu.style.left = "0";
+            menu.style.right = "auto";
+          }
         }
       });
     }
