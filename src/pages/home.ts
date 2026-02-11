@@ -15,7 +15,7 @@ export function renderHomePage() {
         showBack: false,
         right: `
           <button class="nav-connect" id="navConnect" data-tauri-drag-region="false">
-            <span class="material-symbols-rounded">bluetooth</span>
+            <span class="material-symbols-rounded">add_2</span>
           </button>
           <button class="nav-info" id="navSettings" data-tauri-drag-region="false">
             <span class="material-symbols-rounded">settings</span>
