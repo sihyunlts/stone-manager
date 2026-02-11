@@ -10,6 +10,7 @@ let lampToggleEl: HTMLInputElement | null = null;
 let lampBrightnessEl: HTMLInputElement | null = null;
 let lampHueEl: HTMLInputElement | null = null;
 let lampSettingsEl: HTMLElement | null = null;
+let lampHueContainerEl: HTMLElement | null = null;
 let lampTypeSelect: ReturnType<typeof bindSelect> | null = null;
 let lampDebounce: ReturnType<typeof setTimeout> | null = null;
 
@@ -18,6 +19,7 @@ export function initLamp() {
   lampBrightnessEl = document.querySelector<HTMLInputElement>("#lampBrightness");
   lampHueEl = document.querySelector<HTMLInputElement>("#lampHue");
   lampSettingsEl = document.querySelector<HTMLElement>("#lampSettings");
+  lampHueContainerEl = document.querySelector<HTMLElement>("#lampHueContainer");
 
   lampTypeSelect = bindSelect("lampType", (value) => {
     const next = Number(value);
@@ -27,6 +29,7 @@ export function initLamp() {
     if (next === 1) {
       setLampColor(data.lampHue).catch((err) => logLine(String(err), "SYS"));
     }
+    updateLampUI();
   });
 
   lampToggleEl?.addEventListener("change", () => {
@@ -91,6 +94,13 @@ export function updateLampUI() {
   updateRangeFill(lampHueEl);
   if (lampSettingsEl) {
     lampSettingsEl.classList.toggle("is-hidden", !data.lampOn);
+  }
+  if (lampHueContainerEl) {
+    const isVisible = data.lampType === 1;
+    lampHueContainerEl.style.display = isVisible ? "" : "none";
+    if (lampHueContainerEl.parentElement) {
+      lampHueContainerEl.parentElement.style.display = isVisible ? "" : "none";
+    }
   }
 }
 

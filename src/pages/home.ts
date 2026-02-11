@@ -63,7 +63,7 @@ export function renderHomePage() {
                   body: renderRange({ id: "lampBrightness", min: 0, max: 100, step: 0.1, value: 0, className: "thumb-vertical" }),
                 }),
                 renderListItem({
-                      label: "조명 색상",
+                      label: "조명 종류",
                       right: renderSelect({
                         id: "lampType",
                         value: 1,
@@ -77,7 +77,11 @@ export function renderHomePage() {
                         ],
                       }),
                       col: true,
-                      body: renderRange({ id: "lampHue", min: 0, max: 360, step: 1, value: 0, className: "range-hue" }),
+                      body: `
+                      <div id="lampHueContainer">
+                        ${renderRange({ id: "lampHue", min: 0, max: 360, step: 1, value: 0, className: "range-hue" })}
+                      </div>
+                    `,
                 }),
               ])}
             </div>
