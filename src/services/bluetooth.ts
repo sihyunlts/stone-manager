@@ -1,11 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
-import { renderList, renderListItem } from "../components/list";
 import type { ConnectionState } from "../state/connection";
 import {
   getRegisteredDevices,
-  removeRegisteredDevice,
-  upsertRegisteredDevice,
-} from "../state/devices";
+  upsertRegisteredDevice as upsertRegisteredDeviceFromStore,
+} from "../state/registry";
 
 export type DeviceInfo = {
   name: string;
@@ -44,14 +42,7 @@ type ConnectControllerDeps = {
 };
 
 export function initConnectController(deps: ConnectControllerDeps) {
-  const registerList = document.querySelector<HTMLDivElement>("#registerList");
-  const registeredList = document.querySelector<HTMLDivElement>("#registeredList");
-  const activeList = document.querySelector<HTMLDivElement>("#activeList");
-  const registerButton = document.querySelector<HTMLButtonElement>("#registerDevice");
-
   let devices: DeviceInfo[] = [];
-  let registerSelected = "";
-  let registeredSelected = "";
   let registerPending: string | null = null;
 
   function getDeviceLabel(address: string) {
@@ -61,135 +52,15 @@ export function initConnectController(deps: ConnectControllerDeps) {
     return paired?.name ?? address;
   }
 
-  function selectRegister(address: string) {
-    registerSelected = address;
-    registerList?.querySelectorAll(".device-item").forEach((item) => {
-      item.classList.toggle("is-selected", item.getAttribute("data-address") === address);
-    });
-  }
-
-  function selectRegistered(address: string) {
-    registeredSelected = address;
-    registeredList?.querySelectorAll(".device-item").forEach((item) => {
-      item.classList.toggle("is-selected", item.getAttribute("data-address") === address);
-    });
-  }
-
-  function renderRegisterList() {
-    if (!registerList) return;
-    const connectedDevices = devices.filter((d) => d.connected);
-    if (connectedDevices.length === 0) {
-      registerSelected = "";
-      registerList.innerHTML = renderList([
-        renderListItem({
-          label: "연결된 기기가 없습니다.",
-          value: "",
-          className: "device-item-empty",
-        }),
-      ]);
-      return;
-    }
-    registerList.innerHTML = renderList(
-      connectedDevices.map((device) =>
-        renderListItem({
-          label: device.name ?? device.address,
-          className: "device-item",
-          data: { address: device.address },
-        })
-      )
-    );
-    if (registerSelected && connectedDevices.some((d) => d.address === registerSelected)) {
-      selectRegister(registerSelected);
-      return;
-    }
-    const preferred = connectedDevices.find((d) => d.name.toUpperCase().includes("STONE"));
-    if (preferred) {
-      selectRegister(preferred.address);
-      return;
-    }
-    if (connectedDevices[0]) {
-      selectRegister(connectedDevices[0].address);
-    }
-  }
-
-  function renderRegisteredList() {
-    if (!registeredList) return;
-    const pairedDevices = getRegisteredDevices();
-    if (pairedDevices.length === 0) {
-      registeredSelected = "";
-      registeredList.innerHTML = renderList([
-        renderListItem({
-          label: "등록된 기기가 없습니다.",
-          value: "",
-          className: "device-item-empty",
-        }),
-      ]);
-      return;
-    }
-    const options = pairedDevices.map((paired) => {
-      const device = devices.find((d) => d.address === paired.address);
-      const name = device?.name ?? paired.name ?? paired.address;
-      return { address: paired.address, label: name };
-    });
-    registeredList.innerHTML = renderList(
-      options.map((opt) =>
-        renderListItem({
-          label: opt.label,
-          className: "device-item",
-          data: { address: opt.address },
-        })
-      )
-    );
-    if (registeredSelected && pairedDevices.some((d) => d.address === registeredSelected)) {
-      selectRegistered(registeredSelected);
-      return;
-    }
-    if (pairedDevices[0]) {
-      selectRegistered(pairedDevices[0].address);
-    }
-  }
-
-  function renderActiveList() {
-    if (!activeList) return;
-    const activeAddress = deps.getConnectedAddress();
-    if (!activeAddress) {
-      activeList.innerHTML = renderList([
-        renderListItem({
-          label: "연결된 기기가 없습니다.",
-          value: "",
-          className: "device-item-empty",
-        }),
-      ]);
-      return;
-    }
-    const name = getDeviceLabel(activeAddress);
-    activeList.innerHTML = renderList([
-      renderListItem({
-        label: name,
-        className: "device-item is-selected",
-        data: { address: activeAddress },
-      }),
-    ]);
-  }
-
-  function upsertPairedDevice(address: string) {
+  function registerDevice(address: string) {
     if (!address) return;
     const latestName = devices.find((d) => d.address === address)?.name ?? address;
-    upsertRegisteredDevice(address, latestName);
-    renderRegisteredList();
-  }
-
-  function removePairedDevice(address: string) {
-    if (!address) return;
-    removeRegisteredDevice(address);
-    renderRegisteredList();
+    upsertRegisteredDeviceFromStore(address, latestName);
   }
 
   async function refreshDevices() {
     devices = (await invoke<DeviceInfo[]>("list_devices")) ?? [];
-    renderRegisterList();
-    renderRegisteredList();
-    renderActiveList();
+    return devices;
   }
 
   async function syncBackendConnection() {
@@ -197,11 +68,9 @@ export function initConnectController(deps: ConnectControllerDeps) {
       const info = await invoke<ConnectionInfo>("get_connection_info");
       if (info.rfcomm && info.address) {
         deps.setConnected(info.address);
-        upsertPairedDevice(info.address);
-        renderActiveList();
+        registerDevice(info.address);
       } else if (deps.getConnectionState() === "connected") {
         deps.setDisconnected();
-        renderActiveList();
       }
     } catch (err) {
       deps.logLine(String(err), "SYS");
@@ -231,10 +100,9 @@ export function initConnectController(deps: ConnectControllerDeps) {
     }
   }
 
-  async function registerDevice() {
-    const address = registerSelected;
+  async function addDevice(address: string) {
     if (!address) {
-      deps.logLine("Select a device to register", "SYS");
+      deps.logLine("Select a device to pair", "SYS");
       return;
     }
     const state = deps.getConnectionState();
@@ -243,8 +111,8 @@ export function initConnectController(deps: ConnectControllerDeps) {
       return;
     }
     if (state === "connected" && deps.getConnectedAddress() === address) {
-      upsertPairedDevice(address);
-      deps.logLine(`Registered ${getDeviceLabel(address)}`, "SYS");
+      registerDevice(address);
+      deps.logLine(`Device paired: ${getDeviceLabel(address)}`, "SYS");
       return;
     }
     try {
@@ -273,16 +141,15 @@ export function initConnectController(deps: ConnectControllerDeps) {
     const device = devices.find((d) => d.address === result.address);
     if (result.ok) {
       deps.setConnected(result.address);
-      upsertPairedDevice(result.address);
-      renderActiveList();
+      registerDevice(result.address);
       if (registerPending === result.address) {
-        deps.logLine(`Registered ${device?.name ?? result.address}`, "SYS");
+        deps.logLine(`Device paired: ${device?.name ?? result.address}`, "SYS");
         registerPending = null;
       }
       deps.logLine(`Connected to ${device?.name ?? result.address}`, "SYS");
     } else {
       if (registerPending === result.address) {
-        deps.logLine(result.error ?? "Register failed", "SYS");
+        deps.logLine(result.error ?? "Pair failed", "SYS");
         registerPending = null;
       }
       if (deps.getConnectedAddress() === result.address) {
@@ -290,7 +157,6 @@ export function initConnectController(deps: ConnectControllerDeps) {
       } else {
         deps.setConnectionState("idle", deps.getConnectedAddress());
       }
-      renderActiveList();
       deps.logLine(result.error ?? "Connect failed", "SYS");
     }
   }
@@ -300,8 +166,6 @@ export function initConnectController(deps: ConnectControllerDeps) {
     const target = devices.find((d) => d.address === address);
     if (target) {
       target.connected = connected;
-      renderRegisterList();
-      renderRegisteredList();
     } else {
       void refreshDevices().catch((err) => deps.logLine(String(err), "SYS"));
     }
@@ -311,33 +175,12 @@ export function initConnectController(deps: ConnectControllerDeps) {
       }
       deps.setDisconnected();
     }
-    renderActiveList();
   }
 
-  registerList?.addEventListener("click", (event) => {
-    const target = event.target as HTMLElement;
-    const item = target.closest(".device-item") as HTMLElement | null;
-    if (!item) return;
-    const address = item.dataset.address;
-    if (!address) return;
-    selectRegister(address);
-  });
-
-  registeredList?.addEventListener("click", (event) => {
-    const target = event.target as HTMLElement;
-    const item = target.closest(".device-item") as HTMLElement | null;
-    if (!item) return;
-    const address = item.dataset.address;
-    if (!address) return;
-    selectRegistered(address);
-  });
-
-  registerButton?.addEventListener("click", () => {
-    void registerDevice();
-  });
-
   return {
+    getDevices: () => devices,
     connectAddress,
+    addDevice,
     disconnect,
     refreshDevices,
     syncBackendConnection,
