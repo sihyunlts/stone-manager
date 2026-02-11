@@ -3,47 +3,32 @@ type HeaderOptions = {
   titleId?: string;
   right?: string;
   showBack?: boolean;
-  showSidebarToggle?: boolean;
 };
 
 export function renderHeader(options: HeaderOptions) {
-  const { title, titleId, right, showBack, showSidebarToggle = false } = options;
+  const { title, titleId, right, showBack } = options;
 
-  const leftButtons = [
-    showSidebarToggle
-      ? `
-        <button class="nav-sidebar" data-tauri-drag-region="false">
-          <span class="material-symbols-rounded">menu</span>
-        </button>
-      `
-      : "",
-    showBack
-      ? `
+  const leftSlot = showBack
+    ? `
+      <div class="header-left">
         <button class="nav-back" data-tauri-drag-region="false">
           <span class="material-symbols-rounded">arrow_back</span>
         </button>
-      `
-      : "",
-  ]
-    .filter(Boolean)
-    .join("");
+      </div>
+    `
+    : "";
 
   const rightSlot = right
     ? `<div class="header-right">${right}</div>`
     : `<div class="header-spacer"></div>`;
 
   const titleAttrs = titleId ? ` id="${titleId}"` : "";
-  const leftSlot = `
-    <div class="header-left">
-      ${leftButtons ? `<div class="header-actions">${leftButtons}</div>` : ""}
-      <div class="app-title"${titleAttrs} data-tauri-drag-region>${title}</div>
-    </div>
-  `;
 
   return `
     <header class="app-header" data-tauri-drag-region>
       <div class="header-content">
         ${leftSlot}
+        <div class="app-title"${titleAttrs} data-tauri-drag-region>${title}</div>
         ${rightSlot}
       </div>
     </header>
