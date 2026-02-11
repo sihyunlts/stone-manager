@@ -13,7 +13,6 @@ type SelectOptions = {
 
 type SelectBinding = {
   setValue: (value: string | number, emit?: boolean) => void;
-  setEnabled: (enabled: boolean) => void;
   setOptions: (options: SelectOption[], value?: string | number, emit?: boolean) => void;
 };
 
@@ -59,17 +58,11 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
     if (emit) onChange(nextValue);
   }
 
-  function setEnabled(enabled: boolean) {
-    root!.classList.toggle("is-disabled", !enabled);
-    trigger!.disabled = !enabled;
-  }
-
   function bindOptions() {
     options = Array.from(root!.querySelectorAll<HTMLDivElement>(".select-option"));
     options.forEach((option) => {
       option.addEventListener("click", (event) => {
         event.stopPropagation();
-        if (root!.classList.contains("is-disabled")) return;
         const value = option.dataset.value;
         if (!value) return;
         setValue(value, true);
@@ -94,7 +87,6 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
 
   trigger.addEventListener("click", (event) => {
     event.stopPropagation();
-    if (root.classList.contains("is-disabled")) return;
     document.querySelectorAll<HTMLElement>(".select.is-open").forEach((openSelect) => {
       if (openSelect === root) return;
       openSelect.classList.remove("is-open");
@@ -137,5 +129,5 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
     menu.style.right = "";
   });
 
-  return { setValue, setEnabled, setOptions };
+  return { setValue, setOptions };
 }

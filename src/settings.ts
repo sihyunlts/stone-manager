@@ -5,6 +5,7 @@ import { renderSection } from "./components/section";
 export function renderSettingsPage() {
   const stoneInfo = renderSection({
     title: "STONE 정보",
+    id: "settingsStoneInfo",
     body: `
       ${renderList([
         renderListItem({ label: "펌웨어 버전", valueId: "settingsFirmware" }),

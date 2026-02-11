@@ -103,6 +103,7 @@ export function initApp() {
 
             ${renderSection({
               title: "소리",
+              id: "sectionSound",
               body: `
                 <div class="card">
                   <div class="row volume-row">
@@ -113,6 +114,7 @@ export function initApp() {
             })}
             ${renderSection({
               title: "램프",
+              id: "sectionLamp",
               body: `
                 ${renderList([
                   renderListItem({
@@ -174,6 +176,9 @@ export function initApp() {
   const status = el<HTMLDivElement>("#status");
   const battery = el<HTMLDivElement>("#battery");
   const batteryIcon = el<HTMLSpanElement>("#batteryIcon");
+  const sectionSound = el<HTMLElement>("#sectionSound");
+  const sectionLamp = el<HTMLElement>("#sectionLamp");
+  const settingsStoneInfo = document.querySelector<HTMLElement>("#settingsStoneInfo");
   const volumeSlider = el<HTMLInputElement>("#volumeSlider");
   const lampToggle = el<HTMLInputElement>("#lampToggle");
   const lampBrightness = el<HTMLInputElement>("#lampBrightness");
@@ -345,6 +350,12 @@ export function initApp() {
     updateBatteryLabel();
     updateVolumeUI();
     updateLampUI();
+    const connected = isActiveDeviceConnected();
+    sectionSound.style.display = connected ? "" : "none";
+    sectionLamp.style.display = connected ? "" : "none";
+    if (settingsStoneInfo) {
+      settingsStoneInfo.style.display = connected ? "" : "none";
+    }
   }
 
   connectController = initConnectController({
@@ -382,13 +393,6 @@ export function initApp() {
     }
   });
 
-  function setLampEnabled(enabled: boolean) {
-    lampToggle.disabled = !enabled;
-    lampBrightness.disabled = !enabled;
-    lampHue.disabled = !enabled;
-    lampTypeSelect?.setEnabled(enabled);
-  }
-
   function updateLampUI() {
     const data = getActiveDeviceData();
     if (data.lampBrightness === null) {
@@ -401,7 +405,6 @@ export function initApp() {
     lampTypeSelect?.setValue(data.lampType);
     lampHue.value = String(data.lampHue);
     updateRangeFill(lampHue);
-    setLampEnabled(isActiveDeviceConnected());
   }
 
   function sliderToRgb(value: number) {
@@ -476,16 +479,11 @@ export function initApp() {
     await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0213, payload: [] });
   }
 
-  function setVolumeEnabled(enabled: boolean) {
-    volumeSlider.disabled = !enabled;
-  }
-
   function updateVolumeUI() {
     const data = getActiveDeviceData();
     const v = (data.volume === null || Number.isNaN(data.volume)) ? 0 : data.volume;
     volumeSlider.value = String(v);
     updateRangeFill(volumeSlider);
-    setVolumeEnabled(isActiveDeviceConnected());
   }
 
   async function requestVolume() {
@@ -721,7 +719,6 @@ export function initApp() {
   updateVolumeUI();
   updateLampUI();
   volumeSlider.addEventListener("input", () => {
-    if (volumeSlider.disabled) return;
     const value = Number(volumeSlider.value);
     updateActiveDeviceData({ volume: value });
     updateVolumeUI();
@@ -734,7 +731,6 @@ export function initApp() {
     }, 150);
   });
   lampToggle.addEventListener("change", () => {
-    if (lampToggle.disabled) return;
     const currentData = getActiveDeviceData();
     const current = currentData.lampBrightness ?? 0;
     const nextValue = lampToggle.checked
@@ -757,7 +753,6 @@ export function initApp() {
     }
   });
   lampBrightness.addEventListener("input", () => {
-    if (lampBrightness.disabled) return;
     const value = Number(lampBrightness.value);
     const updated = updateActiveDeviceData({
       lampBrightness: value,
@@ -777,7 +772,6 @@ export function initApp() {
     updateRangeFill(lampBrightness);
   });
   lampHue.addEventListener("input", () => {
-    if (lampHue.disabled) return;
     const nextHue = Number(lampHue.value);
     const updated = updateActiveDeviceData({ lampHue: nextHue });
     updateRangeFill(lampHue);
