@@ -1,11 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
-import { renderList, renderListItem } from "./components/list";
-import type { ConnectionState } from "./state/connection";
+import { renderList, renderListItem } from "../components/list";
+import type { ConnectionState } from "../state/connection";
 import {
   getRegisteredDevices,
   removeRegisteredDevice,
   upsertRegisteredDevice,
-} from "./state/devices";
+} from "../state/devices";
 
 export type DeviceInfo = {
   name: string;
@@ -15,7 +15,7 @@ export type DeviceInfo = {
   raw_name?: string | null;
 };
 
-export type { ConnectionState } from "./state/connection";
+export type { ConnectionState } from "../state/connection";
 
 export type ConnectResultEvent = {
   address: string;

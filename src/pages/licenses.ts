@@ -1,6 +1,6 @@
-import { renderHeader } from "./components/header";
-import { renderList, renderListItem } from "./components/list";
-import licenseData from "./assets/licenses.json";
+import { renderHeader } from "../components/header";
+import { renderList, renderListItem } from "../components/list";
+import licenseData from "../assets/licenses.json";
 
 export function renderLicensesPage() {
   const items = licenseData.map((lib: any) => {

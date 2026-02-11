@@ -1,6 +1,6 @@
-import { renderHeader } from "./components/header";
-import { renderList, renderListItem } from "./components/list";
-import { renderSection } from "./components/section";
+import { renderHeader } from "../components/header";
+import { renderList, renderListItem } from "../components/list";
+import { renderSection } from "../components/section";
 
 export function renderSettingsPage() {
   const stoneInfo = renderSection({

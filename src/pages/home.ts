@@ -1,10 +1,10 @@
-import { renderHeader } from "./components/header";
-import { renderRange } from "./components/range";
-import { renderToggle } from "./components/toggle";
-import { renderList, renderListItem } from "./components/list";
-import { renderSection } from "./components/section";
-import { renderSelect } from "./components/select";
-import stoneImg from "./assets/stone.png";
+import { renderHeader } from "../components/header";
+import { renderRange } from "../components/range";
+import { renderToggle } from "../components/toggle";
+import { renderList, renderListItem } from "../components/list";
+import { renderSection } from "../components/section";
+import { renderSelect } from "../components/select";
+import stoneImg from "../assets/stone.png";
 
 export function renderHomePage() {
   return `

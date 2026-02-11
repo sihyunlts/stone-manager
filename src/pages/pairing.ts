@@ -1,6 +1,6 @@
-import { renderHeader } from "./components/header";
-import { renderSection } from "./components/section";
-import { renderList, renderListItem } from "./components/list";
+import { renderHeader } from "../components/header";
+import { renderSection } from "../components/section";
+import { renderList, renderListItem } from "../components/list";
 
 export function renderPairingPage() {
   const registerSection = renderSection({

@@ -1,15 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { listen, type Event } from "@tauri-apps/api/event";
-import { bindDevPage, renderDevPage } from "./dev";
-import { bindSettingsPage, renderSettingsPage } from "./settings";
+import { bindDevPage, renderDevPage } from "./pages/dev";
+import { bindSettingsPage, renderSettingsPage } from "./pages/settings";
 import {
   initConnectController,
   type ConnectResultEvent,
   type DeviceStateEvent,
-} from "./connect";
-import { renderPairingPage } from "./pairing";
-import { renderLicensesPage } from "./licenses";
+} from "./services/bluetooth";
+import { renderPairingPage } from "./pages/pairing";
+import { renderLicensesPage } from "./pages/licenses";
 import { updateRangeFill } from "./components/range";
 import { bindSelect, renderSelect } from "./components/select";
 import { animate } from "motion";
@@ -31,7 +31,7 @@ import {
   getDeviceData,
   updateDeviceData,
 } from "./state/device-data";
-import { renderHomePage } from "./home";
+import { renderHomePage } from "./pages/home";
 
 type GaiaPacketEvent = {
   vendor_id: number;

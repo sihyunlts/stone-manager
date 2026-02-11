@@ -1,6 +1,6 @@
-import { renderHeader } from "./components/header";
-import { renderSection } from "./components/section";
-import { renderList, renderListItem } from "./components/list";
+import { renderHeader } from "../components/header";
+import { renderSection } from "../components/section";
+import { renderList, renderListItem } from "../components/list";
 
 type DevPageHandlers = {
   onSend: (vendorIdHex: string, commandIdHex: string, payloadHex: string) => void | Promise<void>;
