@@ -4,6 +4,7 @@ import { listen, type Event } from "@tauri-apps/api/event";
 import { bindDevPage, renderDevPage } from "./dev";
 import { bindSettingsPage, renderSettingsPage } from "./settings";
 import { renderConnectPage } from "./connect";
+import { renderPairingPage } from "./pairing";
 import { renderLicensesPage } from "./licenses";
 import { renderHeader } from "./components/header";
 import { renderRange, updateRangeFill } from "./components/range";
@@ -160,6 +161,7 @@ export function initApp() {
           </main>
         </div>
         ${renderConnectPage()}
+        ${renderPairingPage()}
         ${renderSettingsPage()}
         ${renderDevPage()}
         ${renderLicensesPage()}
@@ -170,11 +172,13 @@ export function initApp() {
   const navBackButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-back"));
   const navConnect = el<HTMLButtonElement>("#navConnect");
   const navSettings = el<HTMLButtonElement>("#navSettings");
+  const navPairing = el<HTMLButtonElement>("#navPairing");
   const pageHost = el<HTMLDivElement>("#pageHost");
   const pageHome = el<HTMLDivElement>("#page-home");
   const pageDev = el<HTMLDivElement>("#page-dev");
   const pageSettings = el<HTMLDivElement>("#page-settings");
   const pageConnect = el<HTMLDivElement>("#page-connect");
+  const pagePairing = el<HTMLDivElement>("#page-pairing");
   const pageLicenses = el<HTMLDivElement>("#page-licenses");
   const status = el<HTMLDivElement>("#status");
   const battery = el<HTMLDivElement>("#battery");
@@ -203,9 +207,9 @@ export function initApp() {
   let lampLastNonZero = 50;
   let lampOnState = false;
 
-  let currentPage: "home" | "dev" | "settings" | "connect" | "licenses" = "home";
+  let currentPage: "home" | "dev" | "settings" | "connect" | "pairing" | "licenses" = "home";
   let isTransitioning = false;
-  const pageHistory: Array<"home" | "dev" | "settings" | "connect" | "licenses"> = [];
+  const pageHistory: Array<"home" | "dev" | "settings" | "connect" | "pairing" | "licenses"> = [];
 
   pageHome.style.filter = "brightness(1)";
   pageDev.style.zIndex = "0";
@@ -214,17 +218,19 @@ export function initApp() {
   animate(pageDev, { x: "100%" }, { duration: 0 });
   animate(pageSettings, { x: "100%" }, { duration: 0 });
   animate(pageConnect, { x: "100%" }, { duration: 0 });
+  animate(pagePairing, { x: "100%" }, { duration: 0 });
   animate(pageLicenses, { x: "100%" }, { duration: 0 });
   function resetPageStack() {
     pageHome.style.zIndex = "0";
     pageDev.style.zIndex = "0";
     pageSettings.style.zIndex = "0";
     pageConnect.style.zIndex = "0";
+    pagePairing.style.zIndex = "0";
     pageLicenses.style.zIndex = "0";
   }
 
   async function navigate(
-    to: "home" | "dev" | "settings" | "connect" | "licenses",
+    to: "home" | "dev" | "settings" | "connect" | "pairing" | "licenses",
     direction: "forward" | "back"
   ) {
     if (isTransitioning || to === currentPage) return;
@@ -237,9 +243,11 @@ export function initApp() {
           ? pageSettings
           : to === "connect"
             ? pageConnect
-            : to === "licenses"
-              ? pageLicenses
-              : pageHome;
+            : to === "pairing"
+              ? pagePairing
+              : to === "licenses"
+                ? pageLicenses
+                : pageHome;
     const leave =
       currentPage === "dev"
         ? pageDev
@@ -247,9 +255,11 @@ export function initApp() {
           ? pageSettings
           : currentPage === "connect"
             ? pageConnect
-            : currentPage === "licenses"
-              ? pageLicenses
-              : pageHome;
+            : currentPage === "pairing"
+              ? pagePairing
+              : currentPage === "licenses"
+                ? pageLicenses
+                : pageHome;
     resetPageStack();
     if (direction === "forward") {
       bring.style.zIndex = "2";
@@ -287,7 +297,7 @@ export function initApp() {
     isTransitioning = false;
   }
 
-  function goTo(to: "home" | "dev" | "settings" | "connect" | "licenses") {
+  function goTo(to: "home" | "dev" | "settings" | "connect" | "pairing" | "licenses") {
     if (isTransitioning || to === currentPage) return;
     pageHistory.push(currentPage);
     void navigate(to, "forward");
@@ -923,6 +933,9 @@ export function initApp() {
   });
   navConnect.addEventListener("click", () => {
     goTo("connect");
+  });
+  navPairing.addEventListener("click", () => {
+    goTo("pairing");
   });
   const navLicenses = el<HTMLDivElement>("#navLicenses");
   if (navLicenses) {
