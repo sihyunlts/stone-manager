@@ -3,7 +3,6 @@
 #import <IOBluetooth/IOBluetooth.h>
 #import <IOBluetooth/objc/IOBluetoothRFCOMMChannel.h>
 #import <IOBluetooth/objc/IOBluetoothSDPServiceRecord.h>
-#import <objc/runtime.h>
 
 #define BTLOG(fmt, ...) do { \
     NSLog((@"[STONE][BACK][BT] " fmt), ##__VA_ARGS__); \
@@ -140,10 +139,8 @@ static void runOnMainSync(void (^block)(void)) {
     return [device isConnected] == connected;
 }
 
-- (IOReturn)openRFCOMMChannelAndWait:(IOBluetoothDevice *)device
-                           channelID:(BluetoothRFCOMMChannelID)channelID
-                             timeout:(NSTimeInterval)timeout {
-    (void)timeout;
+- (IOReturn)openRFCOMMChannel:(IOBluetoothDevice *)device
+                    channelID:(BluetoothRFCOMMChannelID)channelID {
     __block IOReturn status = kIOReturnError;
     __block IOBluetoothRFCOMMChannel *openedChannel = nil;
 
@@ -224,7 +221,7 @@ static void runOnMainSync(void (^block)(void)) {
             BTLOG(@"GAIA channel (reuse): %d", (int)reuseCh);
             self.lastErrorContext = @"open_rfcomm_reuse";
             BTLOG(@"Open RFCOMM (reuse): ch=%d", (int)reuseCh);
-            IOReturn reuseStatus = [self openRFCOMMChannelAndWait:device channelID:reuseCh timeout:3.0];
+            IOReturn reuseStatus = [self openRFCOMMChannel:device channelID:reuseCh];
             if (reuseStatus == kIOReturnSuccess) {
                 self.lastErrorContext = @"connected";
                 BTLOG(@"RFCOMM connected (reuse): ch=%d", (int)reuseCh);
@@ -278,7 +275,7 @@ static void runOnMainSync(void (^block)(void)) {
 
     self.lastErrorContext = @"open_rfcomm";
     BTLOG(@"Open RFCOMM: ch=%d", (int)resolved);
-    IOReturn status = [self openRFCOMMChannelAndWait:device channelID:resolved timeout:3.0];
+    IOReturn status = [self openRFCOMMChannel:device channelID:resolved];
     if (status == kIOReturnSuccess) {
         self.lastErrorContext = @"connected";
         BTLOG(@"RFCOMM connected: ch=%d", (int)resolved);
@@ -356,11 +353,6 @@ static void runOnMainSync(void (^block)(void)) {
 - (void)rfcommChannelOpenComplete:(IOBluetoothRFCOMMChannel *)rfcommChannel status:(IOReturn)error {
     if (error == kIOReturnSuccess) {
         self.channel = rfcommChannel;
-    }
-    objc_setAssociatedObject(self, @"stone_rfcomm_status", @(error), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    dispatch_semaphore_t sema = (dispatch_semaphore_t)objc_getAssociatedObject(self, @"stone_rfcomm_sema");
-    if (sema) {
-        dispatch_semaphore_signal(sema);
     }
 }
 
