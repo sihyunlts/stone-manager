@@ -1,3 +1,5 @@
+import { animate } from "motion";
+
 type SelectOption = {
   value: string | number;
   label: string;
@@ -67,6 +69,73 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
     if (emit) onChange(nextValue);
   }
 
+  function openMenu() {
+    const direction = root!.dataset.direction ?? "down";
+    root!.classList.toggle("is-up", direction === "up");
+    root!.classList.toggle("is-down", direction === "down");
+    root!.classList.add("is-open");
+    trigger!.setAttribute("aria-expanded", "true");
+
+    menu!.style.left = "";
+    menu!.style.right = "";
+    requestAnimationFrame(() => {
+      const container = root!.closest<HTMLElement>(".layout");
+      const containerRect = container?.getBoundingClientRect();
+      const menuRect = menu!.getBoundingClientRect();
+      if (containerRect) {
+        const overflowRight = menuRect.right > containerRect.right - 8;
+        const overflowLeft = menuRect.left < containerRect.left + 8;
+        if (overflowRight && !overflowLeft) {
+          menu!.style.left = "auto";
+          menu!.style.right = "0";
+        } else if (overflowLeft && !overflowRight) {
+          menu!.style.left = "0";
+          menu!.style.right = "auto";
+        }
+      }
+    });
+
+    const yOffset = direction === "up" ? 8 : -8;
+    animate(menu!, 
+      { 
+        opacity: [0, 1], 
+        scale: [0.95, 1], 
+        y: [yOffset, 0] 
+      } as any, 
+      { 
+        type: "spring",
+        stiffness: 500,
+        damping: 30,
+        mass: 1
+      } as any
+    );
+  }
+
+  async function closeMenu() {
+    if (!root!.classList.contains("is-open")) return;
+    const direction = root!.dataset.direction ?? "down";
+    const yOffset = direction === "up" ? 8 : -8;
+    
+    const animation = animate(menu!, 
+      { 
+        opacity: [1, 0], 
+        y: [0, yOffset] 
+      } as any, 
+      { 
+        type: "spring",
+        stiffness: 500,
+        damping: 35,
+        mass: 1
+      } as any
+    );
+
+    await animation.finished;
+    root!.classList.remove("is-open");
+    trigger!.setAttribute("aria-expanded", "false");
+    menu!.style.left = "";
+    menu!.style.right = "";
+  }
+
   function bindOptions() {
     options = Array.from(root!.querySelectorAll<HTMLDivElement>(".select-option"));
     options.forEach((option) => {
@@ -75,8 +144,7 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
         const value = option.dataset.value;
         if (!value) return;
         setValue(value, true);
-        root!.classList.remove("is-open");
-        trigger!.setAttribute("aria-expanded", "false");
+        closeMenu();
       });
     });
   }
@@ -101,46 +169,24 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
 
   trigger.addEventListener("click", (event) => {
     event.stopPropagation();
-    document.querySelectorAll<HTMLElement>(".select.is-open").forEach((openSelect) => {
-      if (openSelect === root) return;
-      openSelect.classList.remove("is-open");
-      const openTrigger = openSelect.querySelector<HTMLButtonElement>(".select-trigger");
-      if (openTrigger) openTrigger.setAttribute("aria-expanded", "false");
-    });
-    const direction = root.dataset.direction ?? "down";
-    root.classList.toggle("is-up", direction === "up");
-    root.classList.toggle("is-down", direction === "down");
-    const open = root.classList.toggle("is-open");
-    if (open) {
-      menu.style.left = "";
-      menu.style.right = "";
-      requestAnimationFrame(() => {
-        const container = root.closest<HTMLElement>(".layout");
-        const containerRect = container?.getBoundingClientRect();
-        const menuRect = menu.getBoundingClientRect();
-        if (containerRect) {
-          const overflowRight = menuRect.right > containerRect.right - 8;
-          const overflowLeft = menuRect.left < containerRect.left + 8;
-          if (overflowRight && !overflowLeft) {
-            menu.style.left = "auto";
-            menu.style.right = "0";
-          } else if (overflowLeft && !overflowRight) {
-            menu.style.left = "0";
-            menu.style.right = "auto";
-          }
-        }
+    const isOpen = root.classList.contains("is-open");
+    
+    if (isOpen) {
+      closeMenu();
+    } else {
+      document.querySelectorAll<HTMLElement>(".select.is-open").forEach((openSelect) => {
+        if (openSelect === root) return;
+        openSelect.classList.remove("is-open");
+        const openTrigger = openSelect.querySelector<HTMLButtonElement>(".select-trigger");
+        if (openTrigger) openTrigger.setAttribute("aria-expanded", "false");
       });
+      openMenu();
     }
-    trigger.setAttribute("aria-expanded", open ? "true" : "false");
   });
 
   bindOptions();
   document.addEventListener("click", () => {
-    if (!root.classList.contains("is-open")) return;
-    root.classList.remove("is-open");
-    trigger.setAttribute("aria-expanded", "false");
-    menu.style.left = "";
-    menu.style.right = "";
+    closeMenu();
   });
 
   return { setValue, setOptions };
