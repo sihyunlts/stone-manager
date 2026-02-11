@@ -30,7 +30,8 @@ export function renderSelect(options: SelectOptions) {
   return `
     <div id="${id}" class="${classes}" data-value="${currentValue}" data-direction="${direction}">
       <button class="select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
-        ${currentLabel}
+        <span class="select-label">${currentLabel}</span>
+        <span class="material-symbols-rounded select-arrow">expand_more</span>
       </button>
       <div class="select-menu" role="listbox">
         ${optionsMarkup}
@@ -52,7 +53,8 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
     root!.dataset.value = nextValue;
     const option = options.find((item) => item.dataset.value === nextValue);
     if (option) {
-      trigger!.textContent = option.textContent ?? "";
+      const labelEl = trigger!.querySelector(".select-label");
+      if (labelEl) labelEl.textContent = option.textContent ?? "";
       options.forEach((item) => item.classList.toggle("is-selected", item === option));
     }
     if (emit) onChange(nextValue);
