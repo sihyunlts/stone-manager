@@ -57,10 +57,13 @@ export function initConnectController(deps: ConnectControllerDeps) {
     return paired?.name ?? address;
   }
 
-  function registerDevice(address: string) {
+  function registerDevice(address: string, preferredName?: string) {
     if (!address) return;
     const alreadyRegistered = getRegisteredDevices().some((d) => d.address === address);
-    const latestName = devices.find((d) => d.address === address)?.name ?? address;
+    const latestName =
+      preferredName ??
+      devices.find((d) => d.address === address)?.name ??
+      address;
     upsertRegisteredDeviceFromStore(address, latestName);
     if (!alreadyRegistered) {
       deps.onAutoPaired?.(latestName, address);
@@ -186,15 +189,27 @@ export function initConnectController(deps: ConnectControllerDeps) {
   }
 
   function handleConnectResult(result: ConnectResultEvent) {
-    const device = devices.find((d) => d.address === result.address);
+    const cachedName = devices.find((d) => d.address === result.address)?.name;
     if (result.ok) {
       deps.setConnected(result.address);
-      registerDevice(result.address);
-      if (registerPending === result.address) {
-        deps.logLine(`Device paired: ${device?.name ?? result.address}`, "SYS");
-        registerPending = null;
-      }
-      deps.logLine(`Connected to ${device?.name ?? result.address}`, "SYS");
+      void (async () => {
+        try {
+          await refreshDevices();
+        } catch (err) {
+          deps.logLine(String(err), "SYS");
+        } finally {
+          const resolvedName =
+            devices.find((d) => d.address === result.address)?.name ??
+            cachedName ??
+            result.address;
+          registerDevice(result.address, resolvedName);
+          if (registerPending === result.address) {
+            deps.logLine(`Device paired: ${resolvedName}`, "SYS");
+            registerPending = null;
+          }
+          deps.logLine(`Connected to ${resolvedName}`, "SYS");
+        }
+      })();
     } else {
       if (registerPending === result.address) {
         deps.logLine(result.error ?? "Pair failed", "SYS");
