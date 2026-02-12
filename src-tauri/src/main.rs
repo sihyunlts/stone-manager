@@ -208,7 +208,7 @@ fn get_parser() -> &'static Mutex<GaiaParser> {
 extern "C" {
     fn macos_bt_list_paired_devices() -> *mut std::os::raw::c_char;
     fn macos_bt_connect(address: *const std::os::raw::c_char) -> i32;
-    fn macos_bt_disconnect();
+    fn macos_bt_disconnect() -> i32;
     fn macos_bt_write(data: *const u8, len: usize) -> i32;
     fn macos_bt_sdp_query(address: *const std::os::raw::c_char) -> i32;
     fn macos_bt_last_error_context() -> *mut std::os::raw::c_char;
@@ -390,10 +390,33 @@ async fn disconnect_device() -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         back_log("RUST", "Disconnect request".to_string());
-        tauri::async_runtime::spawn_blocking(move || unsafe { macos_bt_disconnect() })
+        let status = tauri::async_runtime::spawn_blocking(move || unsafe { macos_bt_disconnect() })
             .await
             .map_err(|_| "Join error".to_string())?;
-        Ok(())
+        if status == 0 {
+            Ok(())
+        } else {
+            let context = unsafe {
+                let ptr = macos_bt_last_error_context();
+                if ptr.is_null() {
+                    "".to_string()
+                } else {
+                    CString::from_raw(ptr)
+                        .into_string()
+                        .unwrap_or_else(|_| "".to_string())
+                }
+            };
+            Err(format!(
+                "IOBluetooth error {} ({}){}",
+                status,
+                ioreturn_name(status),
+                if context.is_empty() {
+                    "".to_string()
+                } else {
+                    format!(" ({})", context)
+                }
+            ))
+        }
     }
 
     #[cfg(not(target_os = "macos"))]
