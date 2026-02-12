@@ -132,10 +132,20 @@ body {
   min-height: 360px;
 }
 
+.pair-page-description {
+  margin: 0 6px;
+  font-size: 15px;
+  color: var(--muted);
+}
+
 .pair-stage--connecting,
 .pair-stage--success,
 .pair-stage--fail {
   min-height: 340px;
+
+  .pair-page-description {
+    display: none;
+  }
 }
 
 .pair-select-empty {
@@ -159,33 +169,19 @@ body {
   color: var(--muted);
 }
 
-.pair-carousel-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
 .pair-select-scroll {
   display: flex;
   align-items: stretch;
-  gap: 0;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scroll-behavior: smooth;
-  overscroll-behavior-x: contain;
-  padding-bottom: 4px;
+  width: 100%;
 }
 
 .pair-select-scroll.is-locked {
-  overflow: hidden;
   pointer-events: none;
   touch-action: none;
 }
 
 .pair-select-card-item {
-  flex: 0 0 100%;
-  scroll-snap-align: center;
-  scroll-snap-stop: always;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -208,28 +204,6 @@ body {
 .pair-select-address {
   font-size: 15px;
   color: var(--muted);
-}
-
-.pair-select-dots {
-  align-self: center;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.pair-select-dot {
-  width: 6px;
-  height: 6px;
-  padding: 0;
-  border-radius: 999px;
-  border: none;
-  background: var(--border);
-  transition: transform 0.2s ease, background-color 0.2s ease;
-}
-
-.pair-select-dot.is-active {
-  background: var(--accent);
-  transform: scale(1.2);
 }
 
 .pair-select-connect {

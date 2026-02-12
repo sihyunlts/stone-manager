@@ -37,11 +37,9 @@ export function renderAddDevicePage() {
     <div class="page" id="page-pairing" data-page="pairing">
       ${renderHeader({ title: "기기 추가", showBack: true })}
       <main class="layout pairing-layout pair-stage pair-stage--select" id="pairingStage">
-        <div class="pair-carousel-wrap" id="pairCarouselWrap">
-          <div class="pair-select-scroll" id="pairSelectScroll"></div>
-          <div class="pair-select-dots" id="pairSelectDots"></div>
-          <button id="pairSelectConnect" class="pair-select-connect">연결</button>
-        </div>
+        <p class="pair-page-description">STONE의 전원을 켜고 페어링 모드로 전환해 주세요.</p>
+        <div class="pair-select-scroll" id="pairSelectScroll"></div>
+        <button id="pairSelectConnect" class="pair-select-connect">연결</button>
 
         <div class="pair-card-status pair-flow-hidden" id="pairCardStatus">
           <div class="pair-flow-title" id="pairFlowTitle">연결 중</div>
@@ -82,7 +80,6 @@ function summarizeError(message: string | null | undefined) {
 export function initAddDevicePage(handlers: AddDeviceHandlers) {
   const pairingStage = document.querySelector<HTMLElement>("#pairingStage");
   const pairSelectScroll = document.querySelector<HTMLDivElement>("#pairSelectScroll");
-  const pairSelectDots = document.querySelector<HTMLDivElement>("#pairSelectDots");
   const pairSelectConnect = document.querySelector<HTMLButtonElement>("#pairSelectConnect");
 
   const pairCardStatus = document.querySelector<HTMLElement>("#pairCardStatus");
@@ -97,7 +94,6 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
   let scanTimer: number | null = null;
   let refreshInFlight = false;
   let refreshToken = 0;
-  let scrollSyncRaf: number | null = null;
   let stageTransitionToken = 0;
   let stageAnimations: Array<{ cancel: () => void }> = [];
 
@@ -184,56 +180,6 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
     selected = address;
   }
 
-  function scrollToAddress(address: string, behavior: ScrollBehavior = "smooth") {
-    if (!pairSelectScroll) return;
-
-    const cards = Array.from(
-      pairSelectScroll.querySelectorAll<HTMLElement>(".pair-select-card-item")
-    );
-    const selectedCard = cards.find((card) => card.dataset.address === address);
-    if (!selectedCard) return;
-
-    const targetLeft =
-      selectedCard.offsetLeft - (pairSelectScroll.clientWidth - selectedCard.offsetWidth) / 2;
-    pairSelectScroll.scrollTo({ left: Math.max(0, targetLeft), behavior });
-  }
-
-  function syncSelectionFromScroll(scrollEl: HTMLElement) {
-    const cards = Array.from(
-      scrollEl.querySelectorAll<HTMLElement>(".pair-select-card-item")
-    );
-    if (cards.length === 0) return;
-
-    const center = scrollEl.scrollLeft + scrollEl.clientWidth / 2;
-    let nearestIndex = 0;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-
-    cards.forEach((card, index) => {
-      const cardCenter = card.offsetLeft + card.offsetWidth / 2;
-      const distance = Math.abs(cardCenter - center);
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestIndex = index;
-      }
-    });
-
-    const nearestCard = cards[nearestIndex];
-    const nearestAddress = nearestCard.dataset.address;
-    if (nearestAddress) {
-      selected = nearestAddress;
-      lastRenderedSelected = nearestAddress;
-    }
-
-    cards.forEach((card, index) => {
-      card.classList.toggle("is-selected", index === nearestIndex);
-    });
-
-    const dots = Array.from(pairSelectDots?.querySelectorAll<HTMLElement>(".pair-select-dot") ?? []);
-    dots.forEach((dot, index) => {
-      dot.classList.toggle("is-active", index === nearestIndex);
-    });
-  }
-
   function getSelectedCardElement() {
     if (!pairSelectScroll) return null;
     const targetAddress = pendingAddress ?? selected;
@@ -276,16 +222,12 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
   }
 
   function transitionToFlow() {
-    const token = ++stageTransitionToken;
+    ++stageTransitionToken;
     if (!pairCardStatus) return;
     cancelStageAnimations();
 
-    if (pendingAddress) {
-      scrollToAddress(pendingAddress, "auto");
-    }
     pairSelectScroll?.classList.add("is-locked");
     pairCardStatus.classList.remove("pair-flow-hidden");
-    pairSelectDots?.classList.remove("pair-flow-hidden");
     pairSelectConnect?.classList.remove("pair-flow-hidden");
 
     const selectedCard = getSelectedCardElement();
@@ -306,18 +248,6 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
         { duration: 0.2, ease: "easeOut" }
       )
     );
-    if (pairSelectDots) {
-      trackStageAnimation(
-        animate(
-          pairSelectDots,
-          { opacity: [1, 0], y: [0, -4] },
-          { duration: 0.16, ease: "easeIn" }
-        )
-      ).finished.then(() => {
-        if (token !== stageTransitionToken || flowStage === "select") return;
-        pairSelectDots.classList.add("pair-flow-hidden");
-      });
-    }
     if (pairSelectConnect) {
       trackStageAnimation(
         animate(
@@ -338,7 +268,6 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
     cancelStageAnimations();
 
     pairSelectScroll?.classList.remove("is-locked");
-    pairSelectDots?.classList.remove("pair-flow-hidden");
     pairSelectConnect?.classList.remove("pair-flow-hidden");
 
     const selectedCard = getSelectedCardElement();
@@ -352,15 +281,6 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
       );
     }
 
-    if (pairSelectDots) {
-      trackStageAnimation(
-        animate(
-          pairSelectDots,
-          { opacity: [0, 1], y: [-4, 0] },
-          { duration: 0.18, ease: "easeOut" }
-        )
-      );
-    }
     if (pairSelectConnect) {
       trackStageAnimation(
         animate(
@@ -387,7 +307,6 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
     if (!pairCardStatus) return;
     cancelStageAnimations();
     pairSelectScroll?.classList.add("is-locked");
-    pairSelectDots?.classList.add("pair-flow-hidden");
     pairSelectConnect?.classList.add("pair-flow-hidden");
     pairCardStatus.classList.remove("pair-flow-hidden");
     trackStageAnimation(
@@ -427,7 +346,7 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
   }
 
   function renderSelectDevices(devices: PairCandidate[]) {
-    if (!pairSelectScroll || !pairSelectDots || !pairSelectConnect) return;
+    if (!pairSelectScroll || !pairSelectConnect) return;
 
     if (devices.length === 0) {
       const emptyMessage = refreshInFlight ? "STONE 기기 검색 중..." : "표시할 기기가 없습니다.";
@@ -441,8 +360,6 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
           <div class="pair-select-empty-message">기기 전원을 켠 뒤 잠시 기다려 주세요.</div>
         </div>
       `;
-      pairSelectDots.innerHTML = "";
-      pairSelectDots.style.display = "none";
       pairSelectConnect.style.display = "none";
 
       lastRenderMode = "empty";
@@ -456,57 +373,31 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
       selected = devices[0].address;
     }
 
-    const signature = buildDeviceSignature(devices);
+    const selectedDevice = devices.find((device) => device.address === selected) ?? devices[0];
+    selected = selectedDevice.address;
+
+    // Show only one candidate card to keep pairing flow focused on a single target.
+    const signature = buildDeviceSignature([selectedDevice]);
     if (lastRenderMode === "list" && lastRenderSignature === signature) {
-      if (lastRenderedSelected !== selected) {
-        scrollToAddress(selected, "auto");
-        syncSelectionFromScroll(pairSelectScroll);
-      }
+      if (lastRenderedSelected !== selected) lastRenderedSelected = selected;
       return;
     }
 
-    const selectedIndex = Math.max(
-      0,
-      devices.findIndex((device) => device.address === selected)
-    );
-
-    const cardsMarkup = devices
-      .map((device, index) => {
-        const isSelected = index === selectedIndex;
-        return `
-          <article
-            class="pair-select-card-item${isSelected ? " is-selected" : ""}"
-            data-address="${device.address}"
-            role="button"
-            tabindex="0"
-          >
-            <img src="${stoneImg}" class="pair-select-image" alt="STONE" />
-            <div class="pair-select-name">${device.name}</div>
-            <div class="pair-select-address">${device.address}</div>
-          </article>
-        `;
-      })
-      .join("");
-
-    const dotsMarkup = devices
-      .map(
-        (device, index) => `
-          <button
-            class="pair-select-dot${index === selectedIndex ? " is-active" : ""}"
-            data-address="${device.address}"
-            aria-label="${index + 1}번째 기기"
-          ></button>
-        `
-      )
-      .join("");
+    const cardsMarkup = `
+      <article
+        class="pair-select-card-item is-selected"
+        data-address="${selectedDevice.address}"
+        role="button"
+        tabindex="0"
+      >
+        <img src="${stoneImg}" class="pair-select-image" alt="STONE" />
+        <div class="pair-select-name">${selectedDevice.name}</div>
+        <div class="pair-select-address">${selectedDevice.address}</div>
+      </article>
+    `;
 
     pairSelectScroll.innerHTML = cardsMarkup;
-    pairSelectDots.innerHTML = dotsMarkup;
-    pairSelectDots.style.display = "";
     pairSelectConnect.style.display = "";
-
-    scrollToAddress(selected, "auto");
-    syncSelectionFromScroll(pairSelectScroll);
 
     lastRenderMode = "list";
     lastRenderSignature = signature;
@@ -674,13 +565,6 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
     if (flowStage !== "select") return;
     const target = event.target as HTMLElement;
 
-    const dot = target.closest(".pair-select-dot") as HTMLButtonElement | null;
-    if (dot?.dataset.address) {
-      select(dot.dataset.address);
-      scrollToAddress(dot.dataset.address, "smooth");
-      return;
-    }
-
     const connectButton = target.closest("#pairSelectConnect");
     if (connectButton) {
       if (!selected) {
@@ -696,26 +580,8 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
     const address = card.dataset.address;
     if (!address) return;
     select(address);
-    scrollToAddress(address, "smooth");
   };
-
-  const handleSelectScroll = (event: Event) => {
-    if (flowStage !== "select") return;
-    const target = event.target as HTMLElement;
-    if (!target || target.id !== "pairSelectScroll") return;
-
-    if (scrollSyncRaf !== null) {
-      window.cancelAnimationFrame(scrollSyncRaf);
-    }
-    scrollSyncRaf = window.requestAnimationFrame(() => {
-      scrollSyncRaf = null;
-      syncSelectionFromScroll(target);
-    });
-  };
-
-  pairSelectScroll?.addEventListener("scroll", handleSelectScroll, { passive: true });
   pairSelectScroll?.addEventListener("click", handleSelectClick);
-  pairSelectDots?.addEventListener("click", handleSelectClick);
   pairSelectConnect?.addEventListener("click", handleSelectClick);
 
   flowPrimary?.addEventListener("click", () => {
