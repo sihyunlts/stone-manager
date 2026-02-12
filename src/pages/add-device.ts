@@ -53,7 +53,7 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
 
   function render(devices: DeviceInfo[]) {
     if (!pairList) return;
-    const connectedDevices = devices.filter((d) => d.connected);
+    const connectedDevices = devices.filter((d) => d.connected && d.has_gaia);
     if (connectedDevices.length === 0) {
       selected = "";
       pairList.innerHTML = renderList([

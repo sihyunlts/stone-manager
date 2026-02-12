@@ -9,6 +9,7 @@ export type DeviceInfo = {
   name: string;
   address: string;
   connected: boolean;
+  has_gaia: boolean;
   alias?: string | null;
   raw_name?: string | null;
 };

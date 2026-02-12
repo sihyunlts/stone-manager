@@ -552,7 +552,10 @@ char *macos_bt_list_paired_devices(void) {
             if (address.length == 0) {
                 continue;
             }
-            [entries addObject:@{ @"name": name, @"address": address, @"connected": connected }];
+            IOBluetoothSDPUUID *gaiaUUID = [IOBluetoothSDPUUID uuidWithBytes:(const void *)(uint8_t[]){0x00, 0x00, 0x11, 0x07, 0xD1, 0x02, 0x11, 0xE1, 0x9B, 0x23, 0x00, 0x02, 0x5B, 0x00, 0xA5, 0xA5} length:16];
+            IOBluetoothSDPServiceRecord *gaiaRecord = [device getServiceRecordForUUID:gaiaUUID];
+            id hasGaia = gaiaRecord ? (id)kCFBooleanTrue : (id)kCFBooleanFalse;
+            [entries addObject:@{ @"name": name, @"address": address, @"connected": connected, @"has_gaia": hasGaia }];
         }
 
         NSError *error = nil;

@@ -14,6 +14,7 @@ struct BluetoothDeviceInfo {
     name: String,
     address: String,
     connected: bool,
+    has_gaia: bool,
 }
 
 #[derive(Serialize, Clone)]
