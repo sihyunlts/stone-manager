@@ -976,40 +976,6 @@ char *macos_bt_scan_unpaired_stone_devices(void) {
     return jsonCStringFromObject(entries, "[]");
 }
 
-int macos_bt_sdp_query(const char *address) {
-    if (!address) {
-        return (int)kIOReturnBadArgument;
-    }
-
-    NSString *addr = [NSString stringWithUTF8String:address];
-    if (!addr || addr.length == 0) {
-        return (int)kIOReturnBadArgument;
-    }
-
-    @try {
-        IOBluetoothDevice *device = findDeviceForAddress(addr);
-        if (!device) {
-            [StoneBluetoothManager shared].lastErrorContext = @"device_not_found";
-            return (int)kIOReturnNotFound;
-        }
-
-        StoneBluetoothManager *manager = [StoneBluetoothManager shared];
-        StoneDeviceSession *session =
-            [manager sessionForAddress:addr createIfNeeded:YES];
-        if (!session) {
-            manager.lastErrorContext = @"invalid_address";
-            return (int)kIOReturnBadArgument;
-        }
-        session.device = device;
-        [manager registerDisconnectNotification:device];
-        return (int)[manager performSDPQueryAndWaitForSession:session timeout:kStoneOpTimeout];
-    } @catch (NSException *exception) {
-        [StoneBluetoothManager shared].lastErrorContext =
-            [NSString stringWithFormat:@"exception:%@", exception.name];
-        return (int)kIOReturnError;
-    }
-}
-
 char *macos_bt_get_connection_infos(void) {
     __block NSArray<NSDictionary *> *infos = nil;
 

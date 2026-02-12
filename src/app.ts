@@ -280,14 +280,6 @@ export function initApp() {
         logLine(`${toHex(vendorId, 4)} ${toHex(commandId, 4)} ${payload.length ? payload.map(b => toHex(b, 2)).join(" ") : "<empty>"}`, "OUT");
       } catch (err) { logLine(String(err), "SYS"); }
     },
-    onSdpQuery: async () => {
-      const address = getActiveDeviceAddress();
-      if (!address) { logLine("No active device selected", "SYS"); return; }
-      try {
-        await invoke("sdp_query", { address });
-        logLine(`SDP query request (${address})`, "SYS");
-      } catch (err) { logLine(String(err), "SYS"); }
-    },
   });
 
   bindSettingsPage(() => {
