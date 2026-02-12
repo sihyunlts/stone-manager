@@ -11,6 +11,13 @@
 extern void macos_bt_on_data(const uint8_t *data, size_t len);
 extern void macos_bt_on_device_event(const char *address, int connected);
 
+@interface StoneDeviceInquiryCollector : NSObject <IOBluetoothDeviceInquiryDelegate>
+@property (nonatomic, strong) NSMutableDictionary<NSString *, NSDictionary *> *entriesByAddress;
+@property (nonatomic, assign) BOOL completed;
+@property (nonatomic, assign) IOReturn completionStatus;
+@property (nonatomic, strong) dispatch_semaphore_t doneSemaphore;
+@end
+
 @interface StoneBluetoothManager : NSObject <IOBluetoothRFCOMMChannelDelegate>
 @property (nonatomic, strong) IOBluetoothDevice *device;
 @property (nonatomic, strong) IOBluetoothRFCOMMChannel *channel;
@@ -22,6 +29,66 @@ extern void macos_bt_on_device_event(const char *address, int connected);
 @property (nonatomic, assign) BOOL sdpPendingDone;
 @property (nonatomic, assign) IOReturn rfcommPendingStatus;
 @property (nonatomic, assign) BOOL rfcommPendingDone;
+@property (nonatomic, strong) IOBluetoothDeviceInquiry *scanInquiry;
+@property (nonatomic, strong) StoneDeviceInquiryCollector *scanCollector;
+@end
+
+@implementation StoneDeviceInquiryCollector
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _entriesByAddress = [NSMutableDictionary dictionary];
+        _completed = NO;
+        _completionStatus = kIOReturnSuccess;
+    }
+    return self;
+}
+
+- (void)addCandidate:(IOBluetoothDevice *)device {
+    if (!device || [device isPaired]) {
+        return;
+    }
+    NSString *address = device.addressString ?: @"";
+    if (address.length == 0) {
+        return;
+    }
+    NSString *name = device.name ?: @"";
+    if (![[name uppercaseString] containsString:@"STONE"]) {
+        return;
+    }
+    id connected = [device isConnected] ? (id)kCFBooleanTrue : (id)kCFBooleanFalse;
+    NSString *key = [address lowercaseString];
+    self.entriesByAddress[key] = @{
+        @"name": name.length > 0 ? name : @"(unknown)",
+        @"address": address,
+        @"connected": connected,
+        @"has_gaia": (id)kCFBooleanFalse,
+        @"paired": (id)kCFBooleanFalse
+    };
+}
+
+- (void)deviceInquiryDeviceFound:(IOBluetoothDeviceInquiry *)sender device:(IOBluetoothDevice *)device {
+    (void)sender;
+    [self addCandidate:device];
+}
+
+- (void)deviceInquiryDeviceNameUpdated:(IOBluetoothDeviceInquiry *)sender device:(IOBluetoothDevice *)device devicesRemaining:(uint32_t)devicesRemaining {
+    (void)sender;
+    (void)devicesRemaining;
+    [self addCandidate:device];
+}
+
+- (void)deviceInquiryComplete:(IOBluetoothDeviceInquiry *)sender error:(IOReturn)error aborted:(BOOL)aborted {
+    (void)sender;
+    (void)aborted;
+    self.completed = YES;
+    self.completionStatus = error;
+    if (self.doneSemaphore) {
+        dispatch_semaphore_signal(self.doneSemaphore);
+    }
+}
+
 @end
 
 @implementation StoneBluetoothManager
@@ -545,6 +612,7 @@ char *macos_bt_list_paired_devices(void) {
     void (^work)(void) = ^{
         [[StoneBluetoothManager shared] ensureConnectionNotifications];
         NSMutableArray *entries = [NSMutableArray array];
+        IOBluetoothSDPUUID *gaiaUUID = [IOBluetoothSDPUUID uuidWithBytes:(const void *)(uint8_t[]){0x00, 0x00, 0x11, 0x07, 0xD1, 0x02, 0x11, 0xE1, 0x9B, 0x23, 0x00, 0x02, 0x5B, 0x00, 0xA5, 0xA5} length:16];
         for (IOBluetoothDevice *device in [IOBluetoothDevice pairedDevices]) {
             NSString *name = device.name ?: @"(unknown)";
             NSString *address = device.addressString ?: @"";
@@ -552,10 +620,9 @@ char *macos_bt_list_paired_devices(void) {
             if (address.length == 0) {
                 continue;
             }
-            IOBluetoothSDPUUID *gaiaUUID = [IOBluetoothSDPUUID uuidWithBytes:(const void *)(uint8_t[]){0x00, 0x00, 0x11, 0x07, 0xD1, 0x02, 0x11, 0xE1, 0x9B, 0x23, 0x00, 0x02, 0x5B, 0x00, 0xA5, 0xA5} length:16];
             IOBluetoothSDPServiceRecord *gaiaRecord = [device getServiceRecordForUUID:gaiaUUID];
             id hasGaia = gaiaRecord ? (id)kCFBooleanTrue : (id)kCFBooleanFalse;
-            [entries addObject:@{ @"name": name, @"address": address, @"connected": connected, @"has_gaia": hasGaia }];
+            [entries addObject:@{ @"name": name, @"address": address, @"connected": connected, @"has_gaia": hasGaia, @"paired": (id)kCFBooleanTrue }];
         }
 
         NSError *error = nil;
@@ -592,6 +659,92 @@ char *macos_bt_list_paired_devices(void) {
         return strdup("[]");
     }
     return result;
+}
+
+char *macos_bt_scan_unpaired_stone_devices(void) {
+    __block StoneDeviceInquiryCollector *collector = nil;
+    dispatch_semaphore_t started = dispatch_semaphore_create(0);
+    dispatch_semaphore_t done = dispatch_semaphore_create(0);
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        StoneBluetoothManager *manager = [StoneBluetoothManager shared];
+        if (manager.scanInquiry) {
+            (void)[manager.scanInquiry stop];
+            manager.scanInquiry = nil;
+            manager.scanCollector = nil;
+        }
+
+        collector = [[StoneDeviceInquiryCollector alloc] init];
+        collector.doneSemaphore = done;
+        IOBluetoothDeviceInquiry *inquiry = [IOBluetoothDeviceInquiry inquiryWithDelegate:collector];
+        if (!inquiry) {
+            dispatch_semaphore_signal(done);
+            dispatch_semaphore_signal(started);
+            return;
+        }
+
+        inquiry.updateNewDeviceNames = YES;
+        inquiry.inquiryLength = 4;
+        manager.scanCollector = collector;
+        manager.scanInquiry = inquiry;
+
+        IOReturn startStatus = [inquiry start];
+        if (startStatus != kIOReturnSuccess) {
+            BTLOG(@"Inquiry start failed: status=%d", (int)startStatus);
+            manager.scanInquiry = nil;
+            manager.scanCollector = nil;
+            dispatch_semaphore_signal(done);
+        } else {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5 * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                StoneBluetoothManager *current = [StoneBluetoothManager shared];
+                if (current.scanCollector == collector && !collector.completed) {
+                    (void)[current.scanInquiry stop];
+                }
+            });
+        }
+        dispatch_semaphore_signal(started);
+    });
+
+    dispatch_time_t startedWait = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC));
+    if (dispatch_semaphore_wait(started, startedWait) != 0) {
+        return strdup("[]");
+    }
+
+    dispatch_time_t doneWait = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6 * NSEC_PER_SEC));
+    if (dispatch_semaphore_wait(done, doneWait) != 0) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            StoneBluetoothManager *manager = [StoneBluetoothManager shared];
+            if (manager.scanCollector == collector) {
+                (void)[manager.scanInquiry stop];
+                manager.scanInquiry = nil;
+                manager.scanCollector = nil;
+            }
+        });
+        return strdup("[]");
+    }
+
+    __block NSArray *entries = @[];
+    runOnMainSync(^{
+        StoneBluetoothManager *manager = [StoneBluetoothManager shared];
+        if (manager.scanCollector == collector) {
+            entries = [collector.entriesByAddress allValues] ?: @[];
+            manager.scanInquiry = nil;
+            manager.scanCollector = nil;
+        }
+    });
+
+    NSError *error = nil;
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:entries options:0 error:&error];
+    if (!jsonData || error) {
+        return strdup("[]");
+    }
+    NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+    if (!jsonString) {
+        return strdup("[]");
+    }
+    BTLOG(@"Inquiry result: %lu unpaired STONE", (unsigned long)entries.count);
+    return strdup([jsonString UTF8String]);
 }
 
 int macos_bt_sdp_query(const char *address) {

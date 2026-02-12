@@ -5,6 +5,7 @@ import { bindDevPage, renderDevPage } from "./pages/dev";
 import { bindSettingsPage, renderSettingsPage } from "./pages/settings";
 import {
   initConnectController,
+  type DeviceInfo,
   type ConnectResultEvent,
   type DeviceStateEvent,
 } from "./services/bluetooth";
@@ -104,10 +105,13 @@ export function initApp() {
     },
     onPageChange: (to) => {
       if (to === "settings") {
+        addDevicePage?.stopAutoScan();
         requestDynamicDeviceInfo();
       }
       if (to === "pairing") {
-        void addDevicePage?.refresh();
+        addDevicePage?.startAutoScan();
+      } else {
+        addDevicePage?.stopAutoScan();
       }
     }
   });
@@ -251,6 +255,9 @@ export function initApp() {
     refreshDevices: async () => {
       if (!connectController) return [];
       return await connectController.refreshDevices();
+    },
+    scanUnpairedStoneDevices: async () => {
+      return (await invoke<DeviceInfo[]>("scan_unpaired_stone_devices")) ?? [];
     },
     onPair: async (address) => {
       if (!connectController) return;

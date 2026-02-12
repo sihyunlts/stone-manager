@@ -15,6 +15,12 @@ struct BluetoothDeviceInfo {
     address: String,
     connected: bool,
     has_gaia: bool,
+    #[serde(default = "default_true")]
+    paired: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Serialize, Clone)]
@@ -208,6 +214,7 @@ fn get_parser() -> &'static Mutex<GaiaParser> {
 #[cfg(target_os = "macos")]
 extern "C" {
     fn macos_bt_list_paired_devices() -> *mut std::os::raw::c_char;
+    fn macos_bt_scan_unpaired_stone_devices() -> *mut std::os::raw::c_char;
     fn macos_bt_connect(address: *const std::os::raw::c_char) -> i32;
     fn macos_bt_disconnect() -> i32;
     fn macos_bt_write(data: *const u8, len: usize) -> i32;
@@ -263,6 +270,32 @@ async fn list_devices() -> Result<Vec<BluetoothDeviceInfo>, String> {
         let json = unsafe { CString::from_raw(ptr) }
             .into_string()
             .map_err(|_| "Invalid device list encoding".to_string())?;
+        let list: Vec<BluetoothDeviceInfo> = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+        Ok(list)
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err("Not supported on this platform".to_string())
+    }
+}
+
+#[tauri::command]
+async fn scan_unpaired_stone_devices() -> Result<Vec<BluetoothDeviceInfo>, String> {
+    #[cfg(target_os = "macos")]
+    {
+        back_log("RUST", "Scan unpaired STONE devices".to_string());
+        let json = tauri::async_runtime::spawn_blocking(move || {
+            let ptr = unsafe { macos_bt_scan_unpaired_stone_devices() };
+            if ptr.is_null() {
+                return Ok::<String, String>("[]".to_string());
+            }
+            unsafe { CString::from_raw(ptr) }
+                .into_string()
+                .map_err(|_| "Invalid scan list encoding".to_string())
+        })
+        .await
+        .map_err(|_| "Join error".to_string())??;
         let list: Vec<BluetoothDeviceInfo> = serde_json::from_str(&json).map_err(|e| e.to_string())?;
         Ok(list)
     }
@@ -578,6 +611,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             list_devices,
+            scan_unpaired_stone_devices,
             get_connection_info,
             connect_device_async,
             disconnect_device,
