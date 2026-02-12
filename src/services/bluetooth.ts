@@ -41,6 +41,7 @@ type ConnectControllerDeps = {
   setConnectionState: (state: ConnectionState, address?: string | null) => void;
   setConnected: (address: string) => void;
   setDisconnected: () => void;
+  onAutoPaired?: (name: string, address: string) => void;
 };
 
 export function initConnectController(deps: ConnectControllerDeps) {
@@ -200,6 +201,7 @@ export function initConnectController(deps: ConnectControllerDeps) {
           registerDevice(address);
           if (!alreadyRegistered) {
             deps.logLine(`Device paired: ${found.name ?? address}`, "SYS");
+            deps.onAutoPaired?.(found.name ?? address, address);
           }
 
           const state = deps.getConnectionState();

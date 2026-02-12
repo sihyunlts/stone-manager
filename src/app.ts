@@ -27,6 +27,7 @@ import {
   subscribeRegisteredDevices,
 } from "./state/registry";
 import { renderHomePage } from "./pages/home";
+import { initToast } from "./components/toast";
 import { isActiveDeviceConnected, getActiveDeviceLabel } from "./state/active";
 import { toHex, parseHexBytes, logLine } from "./utils/formatter";
 import { el } from "./utils/dom";
@@ -69,6 +70,7 @@ export function initApp() {
       </div>
     </div>
   `;
+  const toast = initToast(app);
 
   const navBackButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-back"));
   const navSidebarButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-sidebar"));
@@ -249,6 +251,7 @@ export function initApp() {
     },
     setConnected,
     setDisconnected,
+    onAutoPaired: (name) => toast.show(name),
   });
   addDevicePage = initAddDevicePage({
     getRegisteredAddresses: () => getRegisteredDevices().map((d) => d.address),

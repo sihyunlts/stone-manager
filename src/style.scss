@@ -4,6 +4,7 @@
 @use "styles/list";
 @use "styles/section";
 @use "styles/select";
+@use "styles/toast";
 
 $material-symbols-font-path: "../node_modules/material-symbols/";
 @import "material-symbols/rounded.scss";
