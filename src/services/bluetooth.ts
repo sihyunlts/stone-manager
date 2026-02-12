@@ -115,14 +115,8 @@ export function initConnectController(deps: ConnectControllerDeps) {
       deps.logLine(`Device paired: ${getDeviceLabel(address)}`, "SYS");
       return;
     }
-    try {
-      registerPending = address;
-      await connectAddress(address);
-    } catch (err) {
-      registerPending = null;
-      deps.logLine(String(err), "SYS");
-      deps.setConnectionState("idle", null);
-    }
+    registerPending = address;
+    await connectAddress(address);
   }
 
   async function disconnect() {
