@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type Event } from "@tauri-apps/api/event";
+import { animate } from "motion";
 import { bindDevPage, renderDevPage } from "./pages/dev";
 import { bindSettingsPage, renderSettingsPage } from "./pages/settings";
 import {
@@ -339,7 +340,47 @@ export function initApp() {
   syncActiveDeviceUI();
   
   subscribeRegisteredDevices(() => { renderDeviceTitle(); syncActiveDeviceUI(); });
-  subscribeActiveDevice(() => { renderDeviceTitle(); syncActiveDeviceUI(); });
+  subscribeActiveDevice(() => { 
+    const layout = pageHome?.querySelector<HTMLElement>(".layout");
+    
+    if (layout) {
+      const exitSpring = {
+        duration: 0.2,
+        easing: [0.5, 0, 1, 0.5]
+      };
+
+      const enterSpring = {
+        type: "spring",
+        stiffness: 600,
+        damping: 60,
+        mass: 0.8
+      };
+
+      animate(layout, 
+        { 
+          opacity: [1, 0], 
+          y: [0, 0],
+          scale: [1, 0.97],
+        } as any, 
+        exitSpring as any
+      ).finished.then(() => {
+        renderDeviceTitle(); 
+        syncActiveDeviceUI(); 
+
+        animate(layout, 
+          { 
+            opacity: [0, 1], 
+            y: [15, 0],
+            scale: [1, 1],
+          } as any, 
+          enterSpring as any
+        );
+      });
+    } else {
+      renderDeviceTitle(); 
+      syncActiveDeviceUI(); 
+    }
+  });
   subscribeConnection(() => { syncActiveDeviceUI(); });
 
   // --- Tauri Listeners ---
