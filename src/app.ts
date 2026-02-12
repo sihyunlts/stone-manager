@@ -98,7 +98,7 @@ export function initApp() {
 
   // --- Navigation ---
 
-  const { goTo, goBack } = initNavigation({
+  const { goTo, goBack, getCurrentPage } = initNavigation({
     pageHost,
     pages: {
       home: pageHome,
@@ -113,9 +113,11 @@ export function initApp() {
         requestDynamicDeviceInfo();
       }
       if (to === "pairing") {
+        addDevicePage?.resetFlow();
         addDevicePage?.startAutoScan();
       } else {
         addDevicePage?.stopAutoScan();
+        addDevicePage?.resetFlow({ shouldRefresh: false });
       }
     }
   });
@@ -255,6 +257,14 @@ export function initApp() {
       if (!connectController) return;
       await connectController.addDevice(address);
     },
+    onCancelPairing: async (address) => {
+      if (!connectController) return;
+      void connectController.disconnectAddress(address);
+    },
+    onConfirmSuccess: () => {
+      goBack();
+      syncActiveDeviceUI();
+    },
     logLine,
   });
 
@@ -315,7 +325,14 @@ export function initApp() {
     navLicenses.addEventListener("click", () => goTo("licenses"));
   }
 
-  navBackButtons.forEach((btn) => btn.addEventListener("click", () => goBack()));
+  navBackButtons.forEach((btn) =>
+    btn.addEventListener("click", () => {
+      if (getCurrentPage() === "pairing" && addDevicePage?.isConnecting()) {
+        addDevicePage.handleBackWhileConnecting();
+      }
+      goBack();
+    })
+  );
   navSidebarButtons.forEach((btn) => {
     btn.addEventListener("click", () => pageHome.classList.toggle("is-sidebar-collapsed"));
   });
@@ -385,6 +402,7 @@ export function initApp() {
 
   listen<ConnectResultEvent>("bt_connect_result", (event) => {
     connectController?.handleConnectResult(event.payload);
+    addDevicePage?.handleConnectResult(event.payload);
     addDevicePage?.render();
   });
   listen<DeviceStateEvent>("bt_device_event", (event) => {
