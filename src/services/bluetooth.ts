@@ -201,18 +201,17 @@ export function initConnectController(deps: ConnectControllerDeps) {
           if (!alreadyRegistered) {
             deps.logLine(`Device paired: ${found.name ?? address}`, "SYS");
           }
+
+          const state = deps.getConnectionState();
+          const current = deps.getConnectedAddress();
+          if (state === "idle" && current !== address) {
+            deps.logLine(`Auto-connect: ${found.name ?? address}`, "SYS");
+            await connectAddress(address);
+          }
         } catch (err) {
           deps.logLine(String(err), "SYS");
         }
       })();
-
-      const isRegistered = getRegisteredDevices().some((d) => d.address === address);
-      const state = deps.getConnectionState();
-      const current = deps.getConnectedAddress();
-      if (isRegistered && state === "idle" && current !== address) {
-        deps.logLine(`Auto-connect: ${getDeviceLabel(address)}`, "SYS");
-        void connectAddress(address);
-      }
     }
   }
 
