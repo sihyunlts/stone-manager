@@ -53,6 +53,7 @@
 
 .list-item.clickable {
   cursor: pointer;
+  padding-right: 44px;
 
   &:hover {
     background-color: rgba(255, 255, 255, 0.05);
@@ -60,5 +61,17 @@
 
   &:active {
     background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  &::before {
+    content: "chevron_right";
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    transform: translateY(-50%);
+    color: var(--border);
+    font-family: "Material Symbols Rounded";
+    font-size: 22px;
+    pointer-events: none;
   }
 }
