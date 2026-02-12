@@ -61,7 +61,6 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
 @interface StoneDeviceInquiryCollector : NSObject <IOBluetoothDeviceInquiryDelegate>
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSDictionary *> *entriesByAddress;
 @property (nonatomic, assign) BOOL completed;
-@property (nonatomic, assign) IOReturn completionStatus;
 @property (nonatomic, strong) dispatch_semaphore_t doneSemaphore;
 @end
 
@@ -87,7 +86,6 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
     if (self) {
         _entriesByAddress = [NSMutableDictionary dictionary];
         _completed = NO;
-        _completionStatus = kIOReturnSuccess;
     }
     return self;
 }
@@ -133,8 +131,8 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
 - (void)deviceInquiryComplete:(IOBluetoothDeviceInquiry *)sender error:(IOReturn)error aborted:(BOOL)aborted {
     (void)sender;
     (void)aborted;
+    (void)error;
     self.completed = YES;
-    self.completionStatus = error;
     if (self.doneSemaphore) {
         dispatch_semaphore_signal(self.doneSemaphore);
     }
@@ -766,11 +764,6 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
     if (self.channel == rfcommChannel) {
         self.channel = nil;
     }
-}
-
-- (void)rfcommChannelOpenComplete:(IOBluetoothRFCOMMChannel *)rfcommChannel status:(IOReturn)error {
-    (void)rfcommChannel;
-    (void)error;
 }
 
 @end
