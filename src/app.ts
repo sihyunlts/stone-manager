@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { animate } from "motion";
 import { bindDevPage, renderDevPage } from "./pages/dev";
 import { bindSettingsPage, renderSettingsPage } from "./pages/settings";
+import { initHeaderScrollTitle } from "./components/header";
 import {
   initConnectController,
   type DeviceInfo,
@@ -93,6 +94,7 @@ export function initApp() {
   let connectController: ReturnType<typeof initConnectController> | null = null;
   let deviceSelectBinding: ReturnType<typeof bindSelect> | null = null;
   let addDevicePage: ReturnType<typeof initAddDevicePage> | null = null;
+  let headerScrollTitle: ReturnType<typeof initHeaderScrollTitle> | null = null;
   let batteryPollingAddress: string | null = null;
   let primedAddress: string | null = null;
   let pendingPairingDebugAction: (() => void) | null = null;
@@ -126,8 +128,12 @@ export function initApp() {
         addDevicePage?.stopAutoScan();
         addDevicePage?.resetFlow({ shouldRefresh: false });
       }
+      headerScrollTitle?.syncPage(to);
     }
   });
+
+  headerScrollTitle = initHeaderScrollTitle({ collapseRangePx: 56 });
+  headerScrollTitle.syncPage("home");
 
   // --- Device UI Helpers ---
 

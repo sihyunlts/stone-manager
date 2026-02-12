@@ -27,6 +27,13 @@
     font-size: 22px;
     flex: 1;
     display: flex;
+
+    &.app-title--collapsed {
+      opacity: 0;
+      transform: translateY(6px);
+      will-change: opacity, transform;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
   }
 
   .header-left {
@@ -41,6 +48,23 @@
     gap: 8px;
     justify-content: flex-end;
     margin-right: -4px;
+  }
+}
+
+.app-header.is-title-collapsed {
+  .app-title--collapsed {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.layout.has-dynamic-header-title {
+  .app-title--large {
+    margin: 0 6px;
+    font-size: 32px;
+    font-weight: 600;
+    will-change: opacity;
+    pointer-events: none;
   }
 }
 
