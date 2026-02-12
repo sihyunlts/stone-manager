@@ -548,7 +548,7 @@ char *macos_bt_list_paired_devices(void) {
         for (IOBluetoothDevice *device in [IOBluetoothDevice pairedDevices]) {
             NSString *name = device.name ?: @"(unknown)";
             NSString *address = device.addressString ?: @"";
-            NSNumber *connected = @([device isConnected] ? YES : NO);
+            id connected = [device isConnected] ? (id)kCFBooleanTrue : (id)kCFBooleanFalse;
             if (address.length == 0) {
                 continue;
             }
@@ -629,13 +629,17 @@ char *macos_bt_get_connection_info(void) {
 
     if (manager.device) {
         address = manager.device.addressString ?: @"";
-        link = [manager.device isConnected] ? YES : NO;
+        link = [manager.device isConnected];
     }
     if (manager.channel) {
         rfcomm = [manager.channel isOpen];
     }
 
-    NSDictionary *info = @{ @"address": address, @"link": @(link), @"rfcomm": @(rfcomm) };
+    NSDictionary *info = @{
+        @"address": address,
+        @"link": link ? (id)kCFBooleanTrue : (id)kCFBooleanFalse,
+        @"rfcomm": rfcomm ? (id)kCFBooleanTrue : (id)kCFBooleanFalse
+    };
     NSError *error = nil;
     NSData *jsonData = [NSJSONSerialization dataWithJSONObject:info options:0 error:&error];
     if (!jsonData || error) {

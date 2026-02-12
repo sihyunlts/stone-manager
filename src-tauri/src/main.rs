@@ -13,7 +13,7 @@ use tauri::tray::{TrayIcon, TrayIconBuilder};
 struct BluetoothDeviceInfo {
     name: String,
     address: String,
-    connected: i8,
+    connected: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -27,7 +27,7 @@ struct GaiaPacketEvent {
     status: Option<u8>,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 struct ConnectionInfo {
     address: String,
     link: bool,
@@ -287,25 +287,8 @@ async fn get_connection_info() -> Result<ConnectionInfo, String> {
         let json = unsafe { CString::from_raw(ptr) }
             .into_string()
             .map_err(|_| "Invalid connection info encoding".to_string())?;
-        let value: serde_json::Value = serde_json::from_str(&json).map_err(|e| e.to_string())?;
-        let address = value
-            .get("address")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
-        let link = value
-            .get("link")
-            .and_then(|v| v.as_bool().or_else(|| v.as_i64().map(|n| n != 0)))
-            .unwrap_or(false);
-        let rfcomm = value
-            .get("rfcomm")
-            .and_then(|v| v.as_bool().or_else(|| v.as_i64().map(|n| n != 0)))
-            .unwrap_or(false);
-        Ok(ConnectionInfo {
-            address,
-            link,
-            rfcomm,
-        })
+        let info: ConnectionInfo = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+        Ok(info)
     }
 
     #[cfg(not(target_os = "macos"))]
