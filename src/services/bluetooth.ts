@@ -189,6 +189,23 @@ export function initConnectController(deps: ConnectControllerDeps) {
     }
 
     if (connected) {
+      void (async () => {
+        try {
+          const latest = await refreshDevices();
+          const found = latest.find((d) => d.address === address);
+          if (!found || !found.connected || !found.has_gaia) {
+            return;
+          }
+          const alreadyRegistered = getRegisteredDevices().some((d) => d.address === address);
+          registerDevice(address);
+          if (!alreadyRegistered) {
+            deps.logLine(`Device paired: ${found.name ?? address}`, "SYS");
+          }
+        } catch (err) {
+          deps.logLine(String(err), "SYS");
+        }
+      })();
+
       const isRegistered = getRegisteredDevices().some((d) => d.address === address);
       const state = deps.getConnectionState();
       const current = deps.getConnectedAddress();
