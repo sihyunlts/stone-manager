@@ -5,11 +5,11 @@ type OnboardingHandlers = {
 export function renderOnboardingPage() {
   return `
     <div class="page" id="page-onboarding" data-page="onboarding">
-      <main class="layout onboarding-layout">
+      <main class="layout flow-layout">
         <div class="onboarding-content">
           <p class="onboarding-message">STONE 매니저</p>
         </div>
-        <div class="onboarding-bottom-actions">
+        <div class="flow-bottom-actions">
           <button id="onboardingNext">시작하기</button>
         </div>
       </main>

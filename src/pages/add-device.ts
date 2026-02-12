@@ -36,7 +36,7 @@ export function renderAddDevicePage() {
   return `
     <div class="page" id="page-pairing" data-page="pairing">
       ${renderHeader({ title: "기기 추가", showBack: true })}
-      <main class="layout pairing-layout pair-stage pair-stage--select" id="pairingStage">
+      <main class="layout flow-layout pair-stage pair-stage--select" id="pairingStage">
         <p class="pair-page-description">STONE의 전원을 켜고 페어링 모드로 전환해 주세요.</p>
         <div class="pair-select-scroll" id="pairSelectScroll"></div>
 
@@ -45,7 +45,7 @@ export function renderAddDevicePage() {
           <div class="pair-flow-message" id="pairFlowMessage">잠시만 기다려 주세요.</div>
         </div>
 
-        <div class="pair-bottom-actions">
+        <div class="flow-bottom-actions">
           <button id="pairSelectConnect" class="pair-select-connect">연결</button>
           <div class="pair-flow-actions pair-flow-hidden" id="pairFlowActions">
             <button id="pairFlowPrimary">확인</button>
