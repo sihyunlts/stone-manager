@@ -175,6 +175,16 @@ export function initConnectController(deps: ConnectControllerDeps) {
       }
       deps.setDisconnected();
     }
+
+    if (connected) {
+      const isRegistered = getRegisteredDevices().some((d) => d.address === address);
+      const state = deps.getConnectionState();
+      const current = deps.getConnectedAddress();
+      if (isRegistered && state === "idle" && current !== address) {
+        deps.logLine(`Auto-connect: ${getDeviceLabel(address)}`, "SYS");
+        void connectAddress(address);
+      }
+    }
   }
 
   return {
