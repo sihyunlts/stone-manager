@@ -413,6 +413,9 @@ export function initApp() {
     .then((devices) => {
       void devices;
       addDevicePage?.render();
+      return connectController?.autoRegisterConnectedGaiaDevices();
+    })
+    .then(() => {
       return connectController?.syncBackendConnection();
     })
     .catch((err) => logLine(String(err), "SYS"));

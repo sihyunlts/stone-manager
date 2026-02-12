@@ -80,6 +80,19 @@ export function initConnectController(deps: ConnectControllerDeps) {
     }
   }
 
+  async function autoRegisterConnectedGaiaDevices() {
+    const latest = await refreshDevices();
+    for (const device of latest) {
+      if (!device.connected || !device.has_gaia) continue;
+      const alreadyRegistered = getRegisteredDevices().some((d) => d.address === device.address);
+      registerDevice(device.address);
+      if (!alreadyRegistered) {
+        deps.logLine(`Device paired: ${device.name ?? device.address}`, "SYS");
+        deps.onAutoPaired?.(device.name ?? device.address, device.address);
+      }
+    }
+  }
+
   async function connectAddress(address: string) {
     if (!address) {
       deps.logLine("Select a device first", "SYS");
@@ -223,6 +236,7 @@ export function initConnectController(deps: ConnectControllerDeps) {
     addDevice,
     disconnect,
     refreshDevices,
+    autoRegisterConnectedGaiaDevices,
     syncBackendConnection,
     handleConnectResult,
     handleDeviceEvent,
