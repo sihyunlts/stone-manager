@@ -295,7 +295,7 @@ static void runOnMainSync(void (^block)(void)) {
 
 - (IOReturn)connectToAddress:(NSString *)address {
     [self ensureConnectionNotifications];
-    const NSTimeInterval opTimeout = 3.0;
+    const NSTimeInterval opTimeout = 6.0;
     if (self.device && address.length > 0) {
         if ([self.device.addressString caseInsensitiveCompare:address] != NSOrderedSame) {
             if (![self disconnectWithTimeout:opTimeout]) {
