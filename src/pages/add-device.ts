@@ -222,7 +222,7 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
   }
 
   function transitionToFlow() {
-    ++stageTransitionToken;
+    const token = ++stageTransitionToken;
     if (!pairCardStatus) return;
     cancelStageAnimations();
 
