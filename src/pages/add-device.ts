@@ -39,12 +39,15 @@ export function renderAddDevicePage() {
       <main class="layout pairing-layout pair-stage pair-stage--select" id="pairingStage">
         <p class="pair-page-description">STONE의 전원을 켜고 페어링 모드로 전환해 주세요.</p>
         <div class="pair-select-scroll" id="pairSelectScroll"></div>
-        <button id="pairSelectConnect" class="pair-select-connect">연결</button>
 
         <div class="pair-card-status pair-flow-hidden" id="pairCardStatus">
           <div class="pair-flow-title" id="pairFlowTitle">연결 중</div>
           <div class="pair-flow-message" id="pairFlowMessage">잠시만 기다려 주세요.</div>
-          <div class="pair-flow-actions" id="pairFlowActions">
+        </div>
+
+        <div class="pair-bottom-actions">
+          <button id="pairSelectConnect" class="pair-select-connect">연결</button>
+          <div class="pair-flow-actions pair-flow-hidden" id="pairFlowActions">
             <button id="pairFlowPrimary">확인</button>
             <button id="pairFlowSecondary">취소</button>
           </div>
@@ -86,6 +89,7 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
 
   const flowTitle = document.querySelector<HTMLElement>("#pairFlowTitle");
   const flowMessage = document.querySelector<HTMLElement>("#pairFlowMessage");
+  const flowActions = document.querySelector<HTMLElement>("#pairFlowActions");
   const flowPrimary = document.querySelector<HTMLButtonElement>("#pairFlowPrimary");
   const flowSecondary = document.querySelector<HTMLButtonElement>("#pairFlowSecondary");
 
@@ -196,6 +200,7 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
     if (flowStage === "connecting") {
       if (flowTitle) flowTitle.textContent = "연결 중";
       if (flowMessage) flowMessage.textContent = `${deviceText} 기기에 연결하고 있어요.`;
+      flowActions?.classList.add("pair-flow-hidden");
       if (flowPrimary) flowPrimary.style.display = "none";
       if (flowSecondary) flowSecondary.style.display = "none";
       return;
@@ -204,6 +209,7 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
     if (flowStage === "success") {
       if (flowTitle) flowTitle.textContent = "연결 완료됨";
       if (flowMessage) flowMessage.textContent = `${deviceText} 연결이 완료되었습니다.`;
+      flowActions?.classList.remove("pair-flow-hidden");
       if (flowPrimary) {
         flowPrimary.style.display = "";
         flowPrimary.textContent = "확인";
@@ -214,6 +220,7 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
 
     if (flowTitle) flowTitle.textContent = "연결 실패";
     if (flowMessage) flowMessage.textContent = summarizeError(lastError);
+    flowActions?.classList.remove("pair-flow-hidden");
     if (flowPrimary) {
       flowPrimary.style.display = "";
       flowPrimary.textContent = "다시 선택";
@@ -269,6 +276,7 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
 
     pairSelectScroll?.classList.remove("is-locked");
     pairSelectConnect?.classList.remove("pair-flow-hidden");
+    flowActions?.classList.add("pair-flow-hidden");
 
     const selectedCard = getSelectedCardElement();
     if (selectedCard) {
