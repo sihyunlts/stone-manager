@@ -4,6 +4,8 @@ import { renderList, renderListItem } from "../components/list";
 
 type DevPageHandlers = {
   onSend: (vendorIdHex: string, commandIdHex: string, payloadHex: string) => void | Promise<void>;
+  onPairingDebugMockSuccess: () => void;
+  onPairingDebugMockFail: () => void;
 };
 
 function getInputValue(selector: string) {
@@ -46,12 +48,31 @@ export function renderDevPage() {
     ]),
   });
 
+  const pairingDebugSection = import.meta.env.DEV
+    ? renderSection({
+        title: "Pairing Flow Debug",
+        body: `
+          ${renderList([
+            renderListItem({
+              body: `
+                <div class="row">
+                  <button id="pairDebugMockSuccess">성공 플로우 진입</button>
+                  <button id="pairDebugMockFail">실패 플로우 진입</button>
+                </div>
+              `,
+            }),
+          ])}
+        `,
+      })
+    : "";
+
   return `
     <div class="page" id="page-dev" data-page="dev">
       ${renderHeader({ title: "개발자 메뉴", showBack: true })}
       <main class="layout">
         ${gaiaSection}
         ${stoneInfoSection}
+        ${pairingDebugSection}
       </main>
     </div>
   `;
@@ -61,11 +82,25 @@ export function bindDevPage(handlers: DevPageHandlers) {
   const sendButton = document.querySelector<HTMLButtonElement>("#sendGaia");
   if (sendButton) {
     sendButton.addEventListener("click", () => {
-    handlers.onSend(
-      getInputValue("#vendorId"),
-      getInputValue("#commandId"),
-      getInputValue("#payload")
-    );
+      handlers.onSend(
+        getInputValue("#vendorId"),
+        getInputValue("#commandId"),
+        getInputValue("#payload")
+      );
+    });
+  }
+
+  const pairDebugMockSuccess = document.querySelector<HTMLButtonElement>("#pairDebugMockSuccess");
+  if (pairDebugMockSuccess) {
+    pairDebugMockSuccess.addEventListener("click", () => {
+      handlers.onPairingDebugMockSuccess();
+    });
+  }
+
+  const pairDebugMockFail = document.querySelector<HTMLButtonElement>("#pairDebugMockFail");
+  if (pairDebugMockFail) {
+    pairDebugMockFail.addEventListener("click", () => {
+      handlers.onPairingDebugMockFail();
     });
   }
 }

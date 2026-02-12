@@ -95,6 +95,7 @@ export function initApp() {
   let addDevicePage: ReturnType<typeof initAddDevicePage> | null = null;
   let batteryPollingAddress: string | null = null;
   let primedAddress: string | null = null;
+  let pendingPairingDebugAction: (() => void) | null = null;
 
   // --- Navigation ---
 
@@ -115,7 +116,13 @@ export function initApp() {
       if (to === "pairing") {
         addDevicePage?.resetFlow();
         addDevicePage?.startAutoScan();
+        const action = pendingPairingDebugAction;
+        pendingPairingDebugAction = null;
+        if (action) {
+          action();
+        }
       } else {
+        pendingPairingDebugAction = null;
         addDevicePage?.stopAutoScan();
         addDevicePage?.resetFlow({ shouldRefresh: false });
       }
@@ -270,6 +277,22 @@ export function initApp() {
 
   // --- Page Bindings ---
 
+  function openPairingPage() {
+    if (getCurrentPage() !== "pairing") {
+      addDevicePage?.resetFlow({ shouldRefresh: false });
+    }
+    goTo("pairing");
+  }
+
+  function runPairingDebugAction(action: () => void) {
+    if (getCurrentPage() === "pairing") {
+      action();
+      return;
+    }
+    pendingPairingDebugAction = action;
+    openPairingPage();
+  }
+
   bindDevPage({
     onSend: async (vendorIdHex, commandIdHex, payloadHex) => {
       const vendorId = parseInt(vendorIdHex, 16);
@@ -289,6 +312,20 @@ export function initApp() {
         await invoke("send_gaia_command", { address, vendorId, commandId, payload });
         logLine(`${toHex(vendorId, 4)} ${toHex(commandId, 4)} ${payload.length ? payload.map(b => toHex(b, 2)).join(" ") : "<empty>"}`, "OUT");
       } catch (err) { logLine(String(err), "SYS"); }
+    },
+    onPairingDebugMockSuccess: () => {
+      runPairingDebugAction(() => {
+        addDevicePage?.resetFlow({ shouldRefresh: false, keepDebugOutcome: true });
+        addDevicePage?.debugPrepareSyntheticOutcome("success");
+        addDevicePage?.render();
+      });
+    },
+    onPairingDebugMockFail: () => {
+      runPairingDebugAction(() => {
+        addDevicePage?.resetFlow({ shouldRefresh: false, keepDebugOutcome: true });
+        addDevicePage?.debugPrepareSyntheticOutcome("fail");
+        addDevicePage?.render();
+      });
     },
   });
 
@@ -318,7 +355,7 @@ export function initApp() {
   });
 
   navSettings.addEventListener("click", () => goTo("settings"));
-  navConnect.addEventListener("click", () => goTo("pairing"));
+  navConnect.addEventListener("click", () => openPairingPage());
   
   const navLicenses = document.querySelector<HTMLDivElement>("#navLicenses");
   if (navLicenses) {
@@ -361,7 +398,7 @@ export function initApp() {
     if (layout) {
       const exitSpring = {
         duration: 0.2,
-        easing: [0.5, 0, 1, 0.5]
+        ease: [0.5, 0, 1, 0.5]
       };
 
       const enterSpring = {

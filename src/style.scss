@@ -124,27 +124,144 @@ body {
   color: var(--muted);
 }
 
-.pair-flow-hidden {
-  display: none !important;
+.pairing-layout {
+  gap: 24px;
 }
 
-.pair-flow {
+.pair-stage {
+  min-height: 360px;
+}
+
+.pair-stage--connecting,
+.pair-stage--success,
+.pair-stage--fail {
+  min-height: 340px;
+}
+
+.pair-select-empty {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 28px 20px;
+}
+
+.pair-select-empty-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.pair-select-empty-message {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pair-carousel-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pair-select-scroll {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
+  padding-bottom: 4px;
+}
+
+.pair-select-scroll.is-locked {
+  overflow: hidden;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.pair-select-card-item {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
   text-align: center;
-  padding: 28px 20px;
+  padding: 24px 20px;
+  cursor: pointer;
+}
+
+.pair-select-image {
+  width: 170px;
+}
+
+.pair-select-name {
+  margin-top: 2px;
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.pair-select-address {
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.pair-select-dots {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pair-select-dot {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border-radius: 999px;
+  border: none;
+  background: var(--border);
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.pair-select-dot.is-active {
+  background: var(--accent);
+  transform: scale(1.2);
+}
+
+.pair-select-connect {
+  align-self: center;
+  width: min(260px, 100%);
+}
+
+.pair-card-status {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+}
+
+.pair-flow-hidden {
+  display: none !important;
+}
+
+.pair-flow {
+  width: 100%;
 }
 
 .pair-flow-title {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 600;
   color: var(--ink);
 }
 
 .pair-flow-message {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--muted);
 }
 
