@@ -130,25 +130,25 @@ export function initConnectController(deps: ConnectControllerDeps) {
     try {
       deps.setConnectionState("disconnecting", previousAddress);
       await invoke("disconnect_device");
+      deps.setDisconnected();
+      deps.logLine("Disconnected", "SYS");
     } catch (err) {
       deps.logLine(String(err), "SYS");
-    }
-
-    try {
-      const info = await invoke<ConnectionInfo>("get_connection_info");
-      if (info.rfcomm && info.address) {
-        deps.setConnected(info.address);
-        deps.logLine("Disconnect not completed (still connected)", "SYS");
-      } else {
-        deps.setDisconnected();
-        deps.logLine("Disconnected", "SYS");
-      }
-    } catch (err) {
-      deps.logLine(String(err), "SYS");
-      if (previousAddress) {
-        deps.setConnectionState("connected", previousAddress);
-      } else {
-        deps.setConnectionState("idle", null);
+      try {
+        const info = await invoke<ConnectionInfo>("get_connection_info");
+        if (info.rfcomm && info.address) {
+          deps.setConnected(info.address);
+          deps.logLine("Disconnect failed (still connected)", "SYS");
+        } else {
+          deps.setDisconnected();
+        }
+      } catch (infoErr) {
+        deps.logLine(String(infoErr), "SYS");
+        if (previousAddress) {
+          deps.setConnectionState("connected", previousAddress);
+        } else {
+          deps.setConnectionState("idle", null);
+        }
       }
     }
   }
