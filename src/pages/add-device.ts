@@ -365,7 +365,6 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
       pairSelectScroll.innerHTML = `
         <div class="pair-select-empty">
           <div class="pair-select-empty-title">${emptyMessage}</div>
-          <div class="pair-select-empty-message">기기 전원을 켠 뒤 잠시 기다려 주세요.</div>
         </div>
       `;
       pairSelectConnect.style.display = "none";
