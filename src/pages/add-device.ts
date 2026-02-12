@@ -4,23 +4,6 @@ import { renderList, renderListItem } from "../components/list";
 import type { DeviceInfo } from "../services/bluetooth";
 
 export function renderAddDevicePage() {
-  const addSection = renderSection({
-    title: "나의 기기",
-    body: `
-      <div id="pairList">
-        ${renderList([
-          renderListItem({
-            label: "연결된 기기가 없습니다.",
-            value: "",
-            className: "device-item-empty",
-          }),
-        ])}
-      </div>
-      <div class="row">
-        <button id="pairDevice">기기 추가</button>
-      </div>
-    `,
-  });
   const unpairedSection = renderSection({
     title: "검색된 기기",
     body: `
@@ -33,6 +16,9 @@ export function renderAddDevicePage() {
           }),
         ])}
       </div>
+      <div class="row">
+        <button id="pairDevice">기기 추가</button>
+      </div>
     `,
   });
 
@@ -40,7 +26,6 @@ export function renderAddDevicePage() {
     <div class="page" id="page-pairing" data-page="pairing">
       ${renderHeader({ title: "기기 추가", showBack: true })}
       <main class="layout">
-        ${addSection}
         ${unpairedSection}
       </main>
     </div>
@@ -48,7 +33,6 @@ export function renderAddDevicePage() {
 }
 
 type AddDeviceHandlers = {
-  getDevices: () => DeviceInfo[];
   getRegisteredAddresses: () => string[];
   refreshDevices: () => Promise<DeviceInfo[]>;
   scanUnpairedStoneDevices: () => Promise<DeviceInfo[]>;
@@ -57,7 +41,6 @@ type AddDeviceHandlers = {
 };
 
 export function initAddDevicePage(handlers: AddDeviceHandlers) {
-  const pairList = document.querySelector<HTMLDivElement>("#pairList");
   const unpairedStoneList = document.querySelector<HTMLDivElement>("#unpairedStoneList");
   const pairButton = document.querySelector<HTMLButtonElement>("#pairDevice");
   let selected = "";
@@ -67,45 +50,21 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
 
   function select(address: string) {
     selected = address;
-    pairList?.querySelectorAll(".device-item").forEach((item) => {
+    unpairedStoneList?.querySelectorAll(".device-item").forEach((item) => {
       item.classList.toggle("is-selected", item.getAttribute("data-address") === address);
     });
   }
 
-  function render(devices: DeviceInfo[]) {
+  function render() {
     const registeredSet = new Set(
       handlers.getRegisteredAddresses().map((address) => address.toLowerCase())
-    );
-    const connectedDevices = devices.filter(
-      (d) => d.paired && d.connected && d.has_gaia && !registeredSet.has(d.address.toLowerCase())
     );
     const unpairedStoneDevices = cachedUnpairedStoneDevices.filter(
       (d) => !registeredSet.has(d.address.toLowerCase())
     );
 
-    if (pairList) {
-      if (connectedDevices.length === 0) {
-        if (!selected || !unpairedStoneDevices.some(d => d.address === selected)) {
-          selected = "";
-        }
-        pairList.innerHTML = renderList([
-          renderListItem({
-            label: "연결된 기기가 없습니다.",
-            value: "",
-            className: "device-item-empty",
-          }),
-        ]);
-      } else {
-        pairList.innerHTML = renderList(
-          connectedDevices.map((device) =>
-            renderListItem({
-              label: device.name ?? device.address,
-              className: "device-item",
-              data: { address: device.address },
-            })
-          )
-        );
-      }
+    if (!selected || !unpairedStoneDevices.some((d) => d.address === selected)) {
+      selected = "";
     }
 
     if (unpairedStoneList) {
@@ -132,8 +91,6 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
 
     if (selected) {
       select(selected);
-    } else if (connectedDevices[0]) {
-      select(connectedDevices[0].address);
     } else if (unpairedStoneDevices[0]) {
       select(unpairedStoneDevices[0].address);
     }
@@ -142,17 +99,18 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
   async function refresh() {
     if (refreshInFlight) return;
     refreshInFlight = true;
-    render(handlers.getDevices());
+    render();
     try {
       const devices = await handlers.refreshDevices();
       const unpairedStoneDevices = await handlers.scanUnpairedStoneDevices();
       cachedUnpairedStoneDevices = unpairedStoneDevices;
-      render(devices);
+      void devices;
+      render();
     } catch (err) {
       handlers.logLine(String(err), "SYS");
     } finally {
       refreshInFlight = false;
-      render(handlers.getDevices());
+      render();
     }
   }
 
@@ -180,7 +138,6 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
     select(address);
   };
 
-  pairList?.addEventListener("click", handleListClick);
   unpairedStoneList?.addEventListener("click", handleListClick);
 
   pairButton?.addEventListener("click", () => {
@@ -188,12 +145,7 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
       handlers.logLine("Select a device to pair", "SYS");
       return;
     }
-    const isPaired = handlers.getDevices().some((d) => d.address === selected && d.paired);
-    if (isPaired) {
-      handlers.logLine(`Connecting to paired device: ${selected}`, "SYS");
-    } else {
-      handlers.logLine(`Initiating pairing for: ${selected}`, "SYS");
-    }
+    handlers.logLine(`Initiating pairing for: ${selected}`, "SYS");
     void handlers.onPair(selected);
   });
 

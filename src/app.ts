@@ -251,7 +251,6 @@ export function initApp() {
     setDisconnected,
   });
   addDevicePage = initAddDevicePage({
-    getDevices: () => connectController?.getDevices() ?? [],
     getRegisteredAddresses: () => getRegisteredDevices().map((d) => d.address),
     refreshDevices: async () => {
       if (!connectController) return [];
@@ -350,7 +349,7 @@ export function initApp() {
   subscribeRegisteredDevices(() => {
     renderDeviceTitle();
     syncActiveDeviceUI();
-    addDevicePage?.render(connectController?.getDevices() ?? []);
+    addDevicePage?.render();
   });
   subscribeActiveDevice(() => { 
     const layout = pageHome?.querySelector<HTMLElement>(".layout");
@@ -399,17 +398,18 @@ export function initApp() {
 
   listen<ConnectResultEvent>("bt_connect_result", (event) => {
     connectController?.handleConnectResult(event.payload);
-    addDevicePage?.render(connectController?.getDevices() ?? []);
+    addDevicePage?.render();
   });
   listen<DeviceStateEvent>("bt_device_event", (event) => {
     connectController?.handleDeviceEvent(event.payload);
-    addDevicePage?.render(connectController?.getDevices() ?? []);
+    addDevicePage?.render();
   });
   listen<GaiaPacketEvent>("gaia_packet", (event) => handleGaiaPacket(event.payload));
 
   connectController?.refreshDevices()
     .then((devices) => {
-      addDevicePage?.render(devices);
+      void devices;
+      addDevicePage?.render();
       return connectController?.syncBackendConnection();
     })
     .catch((err) => logLine(String(err), "SYS"));
