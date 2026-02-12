@@ -185,6 +185,7 @@ fn gaia_frame(vendor_id: u16, command_id: u16, payload: &[u8], flags: u8) -> Res
 fn ioreturn_name(code: i32) -> &'static str {
     match code as u32 {
         0x00000000 => "kIOReturnSuccess",
+        0xE0020002 => "kIOBluetoothConnectionAlreadyExists",
         0xE00002BC => "kIOReturnError",
         0xE00002C0 => "kIOReturnNoDevice",
         0xE00002C5 => "kIOReturnExclusiveAccess",
@@ -284,6 +285,10 @@ async fn list_devices() -> Result<Vec<BluetoothDeviceInfo>, String> {
 async fn scan_unpaired_stone_devices() -> Result<Vec<BluetoothDeviceInfo>, String> {
     #[cfg(target_os = "macos")]
     {
+        if CONNECT_IN_FLIGHT.load(Ordering::SeqCst) {
+            back_log("RUST", "Skip scan while connect is in progress".to_string());
+            return Ok(Vec::new());
+        }
         back_log("RUST", "Scan unpaired STONE devices".to_string());
         let json = tauri::async_runtime::spawn_blocking(move || {
             let ptr = unsafe { macos_bt_scan_unpaired_stone_devices() };
