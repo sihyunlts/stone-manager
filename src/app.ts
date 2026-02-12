@@ -252,6 +252,7 @@ export function initApp() {
   });
   addDevicePage = initAddDevicePage({
     getDevices: () => connectController?.getDevices() ?? [],
+    getRegisteredAddresses: () => getRegisteredDevices().map((d) => d.address),
     refreshDevices: async () => {
       if (!connectController) return [];
       return await connectController.refreshDevices();
@@ -346,7 +347,11 @@ export function initApp() {
   renderDeviceTitle();
   syncActiveDeviceUI();
   
-  subscribeRegisteredDevices(() => { renderDeviceTitle(); syncActiveDeviceUI(); });
+  subscribeRegisteredDevices(() => {
+    renderDeviceTitle();
+    syncActiveDeviceUI();
+    addDevicePage?.render(connectController?.getDevices() ?? []);
+  });
   subscribeActiveDevice(() => { 
     const layout = pageHome?.querySelector<HTMLElement>(".layout");
     

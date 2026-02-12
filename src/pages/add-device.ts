@@ -49,6 +49,7 @@ export function renderAddDevicePage() {
 
 type AddDeviceHandlers = {
   getDevices: () => DeviceInfo[];
+  getRegisteredAddresses: () => string[];
   refreshDevices: () => Promise<DeviceInfo[]>;
   scanUnpairedStoneDevices: () => Promise<DeviceInfo[]>;
   onPair: (address: string) => void | Promise<void>;
@@ -72,8 +73,15 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
   }
 
   function render(devices: DeviceInfo[]) {
-    const connectedDevices = devices.filter((d) => d.paired && d.connected && d.has_gaia);
-    const unpairedStoneDevices = cachedUnpairedStoneDevices;
+    const registeredSet = new Set(
+      handlers.getRegisteredAddresses().map((address) => address.toLowerCase())
+    );
+    const connectedDevices = devices.filter(
+      (d) => d.paired && d.connected && d.has_gaia && !registeredSet.has(d.address.toLowerCase())
+    );
+    const unpairedStoneDevices = cachedUnpairedStoneDevices.filter(
+      (d) => !registeredSet.has(d.address.toLowerCase())
+    );
 
     if (pairList) {
       if (connectedDevices.length === 0) {
@@ -126,6 +134,8 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
       select(selected);
     } else if (connectedDevices[0]) {
       select(connectedDevices[0].address);
+    } else if (unpairedStoneDevices[0]) {
+      select(unpairedStoneDevices[0].address);
     }
   }
 
