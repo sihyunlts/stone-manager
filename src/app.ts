@@ -413,10 +413,10 @@ export function initApp() {
     .then((devices) => {
       void devices;
       addDevicePage?.render();
-      return connectController?.autoRegisterConnectedGaiaDevices();
+      return connectController?.syncBackendConnection();
     })
     .then(() => {
-      return connectController?.syncBackendConnection();
+      return connectController?.autoRegisterConnectedGaiaDevices();
     })
     .catch((err) => logLine(String(err), "SYS"));
 }
