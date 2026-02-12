@@ -2,6 +2,7 @@
 
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -25,6 +26,7 @@ fn default_true() -> bool {
 
 #[derive(Serialize, Clone)]
 struct GaiaPacketEvent {
+    address: String,
     vendor_id: u16,
     command_id: u16,
     command: u16,
@@ -71,7 +73,7 @@ impl GaiaParser {
         }
     }
 
-    fn push_bytes(&mut self, data: &[u8]) -> Vec<GaiaPacketEvent> {
+    fn push_bytes(&mut self, data: &[u8], address: &str) -> Vec<GaiaPacketEvent> {
         let mut packets = Vec::new();
         for &byte in data {
             if self.packet_length > 0 && self.packet_length < self.packet.len() {
@@ -91,7 +93,7 @@ impl GaiaParser {
 
                 self.packet_length += 1;
                 if self.packet_length == self.expected {
-                    if let Some(packet) = parse_gaia_packet(&self.packet[..self.packet_length]) {
+                    if let Some(packet) = parse_gaia_packet(&self.packet[..self.packet_length], address) {
                         packets.push(packet);
                     }
                     self.packet_length = 0;
@@ -106,7 +108,7 @@ impl GaiaParser {
     }
 }
 
-fn parse_gaia_packet(data: &[u8]) -> Option<GaiaPacketEvent> {
+fn parse_gaia_packet(data: &[u8], address: &str) -> Option<GaiaPacketEvent> {
     if data.len() < 8 {
         return None;
     }
@@ -146,6 +148,7 @@ fn parse_gaia_packet(data: &[u8]) -> Option<GaiaPacketEvent> {
     };
 
     Some(GaiaPacketEvent {
+        address: address.to_string(),
         vendor_id,
         command_id,
         command,
@@ -202,14 +205,14 @@ fn back_log(source: &str, message: String) {
 }
 
 static APP_HANDLE: OnceCell<AppHandle> = OnceCell::new();
-static PARSER: OnceCell<Mutex<GaiaParser>> = OnceCell::new();
+static PARSERS: OnceCell<Mutex<HashMap<String, GaiaParser>>> = OnceCell::new();
 static TRAY: OnceCell<TrayIcon<Wry>> = OnceCell::new();
 static TRAY_MENU: OnceCell<Menu<Wry>> = OnceCell::new();
 static TRAY_BATTERY_ITEM: OnceCell<MenuItem<Wry>> = OnceCell::new();
 static CONNECT_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 
-fn get_parser() -> &'static Mutex<GaiaParser> {
-    PARSER.get_or_init(|| Mutex::new(GaiaParser::new()))
+fn get_parsers() -> &'static Mutex<HashMap<String, GaiaParser>> {
+    PARSERS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 #[cfg(target_os = "macos")]
@@ -217,24 +220,26 @@ extern "C" {
     fn macos_bt_list_paired_devices() -> *mut std::os::raw::c_char;
     fn macos_bt_scan_unpaired_stone_devices() -> *mut std::os::raw::c_char;
     fn macos_bt_connect(address: *const std::os::raw::c_char) -> i32;
-    fn macos_bt_disconnect() -> i32;
-    fn macos_bt_write(data: *const u8, len: usize) -> i32;
+    fn macos_bt_disconnect(address: *const std::os::raw::c_char) -> i32;
+    fn macos_bt_write(address: *const std::os::raw::c_char, data: *const u8, len: usize) -> i32;
     fn macos_bt_sdp_query(address: *const std::os::raw::c_char) -> i32;
     fn macos_bt_last_error_context() -> *mut std::os::raw::c_char;
-    fn macos_bt_get_connection_info() -> *mut std::os::raw::c_char;
+    fn macos_bt_get_connection_infos() -> *mut std::os::raw::c_char;
 }
 
 #[no_mangle]
-pub extern "C" fn macos_bt_on_data(data: *const u8, len: usize) {
-    if data.is_null() || len == 0 {
+pub extern "C" fn macos_bt_on_data(address: *const std::os::raw::c_char, data: *const u8, len: usize) {
+    if address.is_null() || data.is_null() || len == 0 {
         return;
     }
+    let address = unsafe { CStr::from_ptr(address) }.to_string_lossy().to_string();
     let bytes = unsafe { std::slice::from_raw_parts(data, len) };
-    let mut parser = match get_parser().lock() {
+    let mut parsers = match get_parsers().lock() {
         Ok(guard) => guard,
         Err(_) => return,
     };
-    let packets = parser.push_bytes(bytes);
+    let parser = parsers.entry(address.clone()).or_insert_with(GaiaParser::new);
+    let packets = parser.push_bytes(bytes, &address);
     if let Some(app) = APP_HANDLE.get() {
         for packet in packets {
             let _ = app.emit("gaia_packet", packet);
@@ -312,22 +317,18 @@ async fn scan_unpaired_stone_devices() -> Result<Vec<BluetoothDeviceInfo>, Strin
 }
 
 #[tauri::command]
-async fn get_connection_info() -> Result<ConnectionInfo, String> {
+async fn get_connection_infos() -> Result<Vec<ConnectionInfo>, String> {
     #[cfg(target_os = "macos")]
     {
-        let ptr = unsafe { macos_bt_get_connection_info() };
+        let ptr = unsafe { macos_bt_get_connection_infos() };
         if ptr.is_null() {
-            return Ok(ConnectionInfo {
-                address: "".to_string(),
-                link: false,
-                rfcomm: false,
-            });
+            return Ok(Vec::new());
         }
         let json = unsafe { CString::from_raw(ptr) }
             .into_string()
             .map_err(|_| "Invalid connection info encoding".to_string())?;
-        let info: ConnectionInfo = serde_json::from_str(&json).map_err(|e| e.to_string())?;
-        Ok(info)
+        let infos: Vec<ConnectionInfo> = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+        Ok(infos)
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -340,7 +341,7 @@ async fn connect_device_async(address: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         if CONNECT_IN_FLIGHT.swap(true, Ordering::SeqCst) {
-            return Err("Connect already in progress".to_string());
+            return Err("Connect already in progress (frontend queue should retry)".to_string());
         }
         let app = APP_HANDLE
             .get()
@@ -408,13 +409,16 @@ async fn connect_device_inner(address: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn disconnect_device() -> Result<(), String> {
+async fn disconnect_device(address: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        back_log("RUST", "Disconnect request".to_string());
-        let status = tauri::async_runtime::spawn_blocking(move || unsafe { macos_bt_disconnect() })
-            .await
-            .map_err(|_| "Join error".to_string())?;
+        back_log("RUST", format!("Disconnect request: {}", address));
+        let status = tauri::async_runtime::spawn_blocking(move || -> Result<i32, String> {
+            let cstr = CString::new(address).map_err(|_| "Invalid address".to_string())?;
+            Ok(unsafe { macos_bt_disconnect(cstr.as_ptr()) })
+        })
+        .await
+        .map_err(|_| "Join error".to_string())??;
         if status == 0 {
             Ok(())
         } else {
@@ -443,18 +447,20 @@ async fn disconnect_device() -> Result<(), String> {
 
     #[cfg(not(target_os = "macos"))]
     {
+        let _ = address;
         Err("Not supported on this platform".to_string())
     }
 }
 
 #[tauri::command]
-async fn send_gaia_command(vendor_id: u16, command_id: u16, payload: Vec<u8>) -> Result<(), String> {
+async fn send_gaia_command(address: String, vendor_id: u16, command_id: u16, payload: Vec<u8>) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         back_log(
             "RUST",
             format!(
-                "Send GAIA command: vendor=0x{:04X} cmd=0x{:04X} len={}",
+                "Send GAIA command: addr={} vendor=0x{:04X} cmd=0x{:04X} len={}",
+                address,
                 vendor_id,
                 command_id,
                 payload.len()
@@ -462,7 +468,8 @@ async fn send_gaia_command(vendor_id: u16, command_id: u16, payload: Vec<u8>) ->
         );
         let status = tauri::async_runtime::spawn_blocking(move || -> Result<i32, String> {
             let frame = gaia_frame(vendor_id, command_id, &payload, 0)?;
-            Ok(unsafe { macos_bt_write(frame.as_ptr(), frame.len()) })
+            let cstr = CString::new(address).map_err(|_| "Invalid address".to_string())?;
+            Ok(unsafe { macos_bt_write(cstr.as_ptr(), frame.as_ptr(), frame.len()) })
         })
         .await
         .map_err(|_| "Join error".to_string())??;
@@ -475,7 +482,7 @@ async fn send_gaia_command(vendor_id: u16, command_id: u16, payload: Vec<u8>) ->
 
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (vendor_id, command_id, payload);
+        let _ = (address, vendor_id, command_id, payload);
         Err("Not supported on this platform".to_string())
     }
 }
@@ -617,7 +624,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             list_devices,
             scan_unpaired_stone_devices,
-            get_connection_info,
+            get_connection_infos,
             connect_device_async,
             disconnect_device,
             send_gaia_command,

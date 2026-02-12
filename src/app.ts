@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen, type Event } from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
 import { animate } from "motion";
 import { bindDevPage, renderDevPage } from "./pages/dev";
 import { bindSettingsPage, renderSettingsPage } from "./pages/settings";
@@ -13,10 +13,9 @@ import { initAddDevicePage, renderAddDevicePage } from "./pages/add-device";
 import { renderLicensesPage } from "./pages/licenses";
 import { renderSelect, bindSelect } from "./components/select";
 import {
-  getConnectionSnapshot,
-  setConnectionSnapshot,
+  getDeviceConnection,
+  removeDeviceConnection,
   subscribeConnection,
-  type ConnectionState,
 } from "./state/connection";
 import {
   getActiveDeviceAddress,
@@ -31,7 +30,7 @@ import { initToast } from "./components/toast";
 import { isActiveDeviceConnected, getActiveDeviceLabel } from "./state/active";
 import { toHex, parseHexBytes, logLine } from "./utils/formatter";
 import { el } from "./utils/dom";
-import { initNavigation, type PageId } from "./utils/navigation";
+import { initNavigation } from "./utils/navigation";
 import { handleGaiaPacket, type GaiaPacketEvent } from "./services/gaia";
 import {
   initBattery,
@@ -55,6 +54,7 @@ import {
   initDeviceInfo,
   requestStaticDeviceInfo,
   requestDynamicDeviceInfo,
+  updateDeviceInfoUI,
 } from "./services/device-info";
 
 export function initApp() {
@@ -93,6 +93,8 @@ export function initApp() {
   let connectController: ReturnType<typeof initConnectController> | null = null;
   let deviceSelectBinding: ReturnType<typeof bindSelect> | null = null;
   let addDevicePage: ReturnType<typeof initAddDevicePage> | null = null;
+  let batteryPollingAddress: string | null = null;
+  let primedAddress: string | null = null;
 
   // --- Navigation ---
 
@@ -148,10 +150,32 @@ export function initApp() {
   function syncActiveDeviceUI() {
     updateConnectionStatus();
     updateStatusAction();
+    updateDeviceInfoUI();
     updateBatteryLabel();
     updateVolumeUI();
     updateLampUI();
     const connected = isActiveDeviceConnected();
+    const active = getActiveDeviceAddress();
+    if (connected && active) {
+      if (batteryPollingAddress !== active) {
+        startBatteryPolling();
+        batteryPollingAddress = active;
+      }
+      if (primedAddress !== active) {
+        requestBattery().catch((err) => logLine(String(err), "SYS"));
+        requestVolume().catch((err) => logLine(String(err), "SYS"));
+        requestLampState().catch((err) => logLine(String(err), "SYS"));
+        requestStaticDeviceInfo();
+        primedAddress = active;
+      }
+    } else {
+      stopBatteryPolling();
+      batteryPollingAddress = null;
+      resetBatteryState();
+      if (!active || active === primedAddress) {
+        primedAddress = null;
+      }
+    }
     sectionSound.style.display = connected ? "" : "none";
     sectionLamp.style.display = connected ? "" : "none";
     if (settingsStoneInfo) {
@@ -160,8 +184,9 @@ export function initApp() {
   }
 
   function updateConnectionStatus() {
-    const { state, address } = getConnectionSnapshot();
     const active = getActiveDeviceAddress();
+    const activeConnection = active ? getDeviceConnection(active) : null;
+    const state = activeConnection?.state ?? "idle";
     switch (state) {
       case "connecting":
         status.textContent = "연결 중...";
@@ -172,13 +197,8 @@ export function initApp() {
         status.classList.remove("connected");
         break;
       case "connected": {
-        if (active && address !== active) {
-          status.textContent = `${getActiveDeviceLabel() ?? "STONE"}이 연결되지 않음`;
-          status.classList.remove("connected");
-          break;
-        }
-        const label = address
-          ? connectController?.getDeviceLabel(address) ?? address
+        const label = active
+          ? connectController?.getDeviceLabel(active) ?? active
           : "Unknown";
         status.textContent = label;
         status.classList.add("connected");
@@ -211,29 +231,6 @@ export function initApp() {
     }
   }
 
-  // --- Connection Actions ---
-
-  function setConnected(address: string) {
-    setConnectionSnapshot("connected", address);
-    setActiveDeviceAddress(address);
-    requestBattery().catch((err) => logLine(String(err), "SYS"));
-    requestVolume().catch((err) => logLine(String(err), "SYS"));
-    requestLampState().catch((err) => logLine(String(err), "SYS"));
-    requestStaticDeviceInfo();
-    startBatteryPolling();
-    updateVolumeUI();
-    updateLampUI();
-  }
-
-  function setDisconnected() {
-    stopBatteryPolling();
-    resetBatteryState();
-    updateVolumeUI();
-    updateLampUI();
-    setConnectionSnapshot("idle", null);
-    updateConnectionStatus();
-  }
-
   // --- Init Services ---
 
   initBattery();
@@ -243,14 +240,6 @@ export function initApp() {
 
   connectController = initConnectController({
     logLine,
-    getConnectionState: () => getConnectionSnapshot().state,
-    getConnectedAddress: () => getConnectionSnapshot().address,
-    setConnectionState: (state, addr) => {
-      setConnectionSnapshot(state, addr ?? getConnectionSnapshot().address);
-      updateConnectionStatus();
-    },
-    setConnected,
-    setDisconnected,
     onAutoPaired: (name) => toast.show(name),
   });
   addDevicePage = initAddDevicePage({
@@ -279,10 +268,15 @@ export function initApp() {
         logLine("Invalid vendor or command id", "SYS");
         return;
       }
+      const address = getActiveDeviceAddress();
+      if (!address) {
+        logLine("No active device selected", "SYS");
+        return;
+      }
       let payload = [];
       try { payload = parseHexBytes(payloadHex); } catch (err) { logLine(String(err), "SYS"); return; }
       try {
-        await invoke("send_gaia_command", { vendorId, commandId, payload });
+        await invoke("send_gaia_command", { address, vendorId, commandId, payload });
         logLine(`${toHex(vendorId, 4)} ${toHex(commandId, 4)} ${payload.length ? payload.map(b => toHex(b, 2)).join(" ") : "<empty>"}`, "OUT");
       } catch (err) { logLine(String(err), "SYS"); }
     },
@@ -307,7 +301,7 @@ export function initApp() {
     const active = getActiveDeviceAddress();
     if (!active || !connectController) return;
     if (isActiveDeviceConnected()) {
-      void connectController.disconnect();
+      void connectController.disconnectAddress(active);
     } else {
       void connectController.connectAddress(active);
     }
@@ -317,10 +311,8 @@ export function initApp() {
     const active = getActiveDeviceAddress();
     if (!active || isActiveDeviceConnected()) return;
     removeRegisteredDevice(active);
-    if (getConnectionSnapshot().address === active) {
-      setConnectionSnapshot("idle", null);
-      updateConnectionStatus();
-    }
+    removeDeviceConnection(active);
+    updateConnectionStatus();
   });
 
   navSettings.addEventListener("click", () => goTo("settings"));
@@ -413,10 +405,13 @@ export function initApp() {
     .then((devices) => {
       void devices;
       addDevicePage?.render();
-      return connectController?.syncBackendConnection();
+      return connectController?.syncBackendConnections();
     })
     .then(() => {
       return connectController?.autoRegisterConnectedGaiaDevices();
+    })
+    .then(() => {
+      return connectController?.autoConnectRegisteredDevices();
     })
     .catch((err) => logLine(String(err), "SYS"));
 }

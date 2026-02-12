@@ -1,7 +1,16 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ConnectionState } from "../state/connection";
 import {
+  getDeviceConnection,
+  replaceConnectionInfos,
+  setDeviceConnected,
+  setDeviceConnectionState,
+  setDeviceDisconnected,
+  setDeviceLinkState,
+} from "../state/connection";
+import {
+  getActiveDeviceAddress,
   getRegisteredDevices,
+  setActiveDeviceAddress,
   upsertRegisteredDevice as upsertRegisteredDeviceFromStore,
 } from "../state/registry";
 
@@ -29,40 +38,54 @@ export type DeviceStateEvent = {
 };
 
 type ConnectionInfo = {
-  address: string | null;
+  address: string;
   link: boolean;
   rfcomm: boolean;
 };
 
+type ConnectQueueReason = "manual" | "startup" | "pair";
+
+type ConnectQueueItem = {
+  address: string;
+  reason: ConnectQueueReason;
+  activateOnSuccess: boolean;
+  quiet: boolean;
+};
+
 type ConnectControllerDeps = {
   logLine: (line: string, tone?: "IN" | "OUT" | "SYS") => void;
-  getConnectionState: () => ConnectionState;
-  getConnectedAddress: () => string | null;
-  setConnectionState: (state: ConnectionState, address?: string | null) => void;
-  setConnected: (address: string) => void;
-  setDisconnected: () => void;
   onAutoPaired?: (name: string, address: string) => void;
 };
+
+function normalizeAddress(address: string) {
+  return address.trim().toLowerCase();
+}
+
+function isSameAddress(a: string, b: string) {
+  return normalizeAddress(a) === normalizeAddress(b);
+}
 
 export function initConnectController(deps: ConnectControllerDeps) {
   let devices: DeviceInfo[] = [];
   let registerPending: string | null = null;
   let eventRefreshInFlight = false;
   let eventRefreshPending = false;
+  const connectQueue: ConnectQueueItem[] = [];
+  let connectInFlight: ConnectQueueItem | null = null;
 
   function getDeviceLabel(address: string) {
-    const device = devices.find((d) => d.address === address);
+    const device = devices.find((d) => isSameAddress(d.address, address));
     if (device?.name) return device.name;
-    const paired = getRegisteredDevices().find((d) => d.address === address);
+    const paired = getRegisteredDevices().find((d) => isSameAddress(d.address, address));
     return paired?.name ?? address;
   }
 
   function registerDevice(address: string, preferredName?: string) {
     if (!address) return;
-    const alreadyRegistered = getRegisteredDevices().some((d) => d.address === address);
+    const alreadyRegistered = getRegisteredDevices().some((d) => isSameAddress(d.address, address));
     const latestName =
       preferredName ??
-      devices.find((d) => d.address === address)?.name ??
+      devices.find((d) => isSameAddress(d.address, address))?.name ??
       address;
     upsertRegisteredDeviceFromStore(address, latestName);
     if (!alreadyRegistered) {
@@ -92,14 +115,122 @@ export function initConnectController(deps: ConnectControllerDeps) {
     }
   }
 
-  async function syncBackendConnection() {
+  function dequeueNextConnect() {
+    if (connectInFlight || connectQueue.length === 0) return;
+
+    const next = connectQueue.shift();
+    if (!next) return;
+
+    connectInFlight = next;
+    setDeviceConnectionState(next.address, "connecting", { lastError: null });
+
+    invoke("connect_device_async", { address: next.address })
+      .catch((err) => {
+        const message = String(err);
+        setDeviceDisconnected(next.address, { lastError: message });
+        if (registerPending && isSameAddress(registerPending, next.address)) {
+          deps.logLine(message, "SYS");
+          registerPending = null;
+        } else if (!next.quiet) {
+          deps.logLine(message, "SYS");
+        }
+        connectInFlight = null;
+        dequeueNextConnect();
+      });
+  }
+
+  function enqueueConnect(item: ConnectQueueItem) {
+    const address = item.address;
+    const current = getDeviceConnection(address);
+
+    if (current?.rfcomm && current.state === "connected") {
+      if (item.reason === "pair") {
+        registerDevice(address);
+        deps.logLine(`Device paired: ${getDeviceLabel(address)}`, "SYS");
+      } else if (!item.quiet) {
+        deps.logLine("Already connected", "SYS");
+      }
+      if (item.activateOnSuccess) {
+        setActiveDeviceAddress(address);
+      }
+      return;
+    }
+
+    if (connectInFlight && isSameAddress(connectInFlight.address, address)) {
+      if (!item.quiet) deps.logLine("Connect already in progress", "SYS");
+      return;
+    }
+    if (connectQueue.some((queued) => isSameAddress(queued.address, address))) {
+      if (!item.quiet) deps.logLine("Connect already queued", "SYS");
+      return;
+    }
+
+    connectQueue.push(item);
+    dequeueNextConnect();
+  }
+
+  function handleConnectResult(result: ConnectResultEvent) {
+    const current = connectInFlight && isSameAddress(connectInFlight.address, result.address)
+      ? connectInFlight
+      : null;
+    const cachedName = devices.find((d) => isSameAddress(d.address, result.address))?.name;
+
+    if (result.ok) {
+      setDeviceConnected(result.address);
+      void refreshDevices().catch((err) => deps.logLine(String(err), "SYS"));
+
+      const resolvedName =
+        devices.find((d) => isSameAddress(d.address, result.address))?.name ??
+        cachedName ??
+        result.address;
+      registerDevice(result.address, resolvedName);
+
+      if (registerPending && isSameAddress(registerPending, result.address)) {
+        deps.logLine(`Device paired: ${resolvedName}`, "SYS");
+        registerPending = null;
+      }
+
+      if (current?.activateOnSuccess) {
+        setActiveDeviceAddress(result.address);
+      } else if (!getActiveDeviceAddress()) {
+        setActiveDeviceAddress(result.address);
+      }
+
+      if (!current?.quiet) {
+        deps.logLine(`Connected to ${resolvedName}`, "SYS");
+      }
+    } else {
+      const message = result.error ?? "Connect failed";
+      setDeviceDisconnected(result.address, { lastError: message });
+
+      if (registerPending && isSameAddress(registerPending, result.address)) {
+        deps.logLine(message, "SYS");
+        registerPending = null;
+      } else if (!current?.quiet) {
+        deps.logLine(message, "SYS");
+      }
+    }
+
+    if (current) {
+      connectInFlight = null;
+      dequeueNextConnect();
+    }
+  }
+
+  async function syncBackendConnections() {
     try {
-      const info = await invoke<ConnectionInfo>("get_connection_info");
-      if (info.rfcomm && info.address) {
-        deps.setConnected(info.address);
+      const infos = await invoke<ConnectionInfo[]>("get_connection_infos");
+      replaceConnectionInfos(infos ?? []);
+
+      for (const info of infos ?? []) {
+        if (!info.rfcomm) continue;
         registerDevice(info.address);
-      } else if (deps.getConnectionState() === "connected") {
-        deps.setDisconnected();
+      }
+      if (!getActiveDeviceAddress()) {
+        const firstConnected = (infos ?? []).find((info) => info.rfcomm);
+        if (firstConnected) {
+          setActiveDeviceAddress(firstConnected.address);
+        }
       }
     } catch (err) {
       deps.logLine(String(err), "SYS");
@@ -110,11 +241,37 @@ export function initConnectController(deps: ConnectControllerDeps) {
     const latest = await refreshDevices();
     for (const device of latest) {
       if (!device.connected || !device.has_gaia) continue;
-      const alreadyRegistered = getRegisteredDevices().some((d) => d.address === device.address);
+      const alreadyRegistered = getRegisteredDevices().some((d) => isSameAddress(d.address, device.address));
       registerDevice(device.address);
       if (!alreadyRegistered) {
         deps.logLine(`Device paired: ${device.name ?? device.address}`, "SYS");
       }
+    }
+  }
+
+  async function autoConnectRegisteredDevices() {
+    const registered = getRegisteredDevices();
+    if (registered.length === 0) return;
+
+    const active = getActiveDeviceAddress();
+    const ordered = [
+      ...(active ? [active] : []),
+      ...registered.map((d) => d.address).filter((address) => !active || !isSameAddress(address, active)),
+    ];
+
+    const seen = new Set<string>();
+    for (const address of ordered) {
+      const key = normalizeAddress(address);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      const conn = getDeviceConnection(address);
+      if (conn?.rfcomm && conn.state === "connected") continue;
+      enqueueConnect({
+        address,
+        reason: "startup",
+        activateOnSuccess: false,
+        quiet: true,
+      });
     }
   }
 
@@ -123,22 +280,19 @@ export function initConnectController(deps: ConnectControllerDeps) {
       deps.logLine("Select a device first", "SYS");
       return;
     }
-    const state = deps.getConnectionState();
-    if (state === "connecting" || state === "disconnecting") {
-      deps.logLine("Connect already in progress", "SYS");
+
+    const current = getDeviceConnection(address);
+    if (current?.state === "disconnecting") {
+      deps.logLine("Disconnect in progress", "SYS");
       return;
     }
-    if (state === "connected" && deps.getConnectedAddress() === address) {
-      deps.logLine("Already connected", "SYS");
-      return;
-    }
-    try {
-      deps.setConnectionState("connecting", address);
-      await invoke("connect_device_async", { address });
-    } catch (err) {
-      deps.logLine(String(err), "SYS");
-      deps.setConnectionState("idle", null);
-    }
+
+    enqueueConnect({
+      address,
+      reason: "manual",
+      activateOnSuccess: true,
+      quiet: false,
+    });
   }
 
   async function addDevice(address: string) {
@@ -146,100 +300,53 @@ export function initConnectController(deps: ConnectControllerDeps) {
       deps.logLine("Select a device to pair", "SYS");
       return;
     }
-    const state = deps.getConnectionState();
-    if (state === "connecting" || state === "disconnecting") {
-      deps.logLine("Connect already in progress", "SYS");
-      return;
-    }
-    if (state === "connected" && deps.getConnectedAddress() === address) {
-      registerDevice(address);
-      deps.logLine(`Device paired: ${getDeviceLabel(address)}`, "SYS");
-      return;
-    }
     registerPending = address;
-    await connectAddress(address);
+    enqueueConnect({
+      address,
+      reason: "pair",
+      activateOnSuccess: true,
+      quiet: false,
+    });
   }
 
-  async function disconnect() {
-    const previousAddress = deps.getConnectedAddress();
+  async function disconnectAddress(address: string) {
+    if (!address) return;
+    setDeviceConnectionState(address, "disconnecting");
     try {
-      deps.setConnectionState("disconnecting", previousAddress);
-      await invoke("disconnect_device");
-      deps.setDisconnected();
+      await invoke("disconnect_device", { address });
+      setDeviceDisconnected(address, { lastError: null });
       deps.logLine("Disconnected", "SYS");
     } catch (err) {
-      deps.logLine(String(err), "SYS");
+      const message = String(err);
+      deps.logLine(message, "SYS");
       try {
-        const info = await invoke<ConnectionInfo>("get_connection_info");
-        if (info.rfcomm && info.address) {
-          deps.setConnected(info.address);
+        const infos = await invoke<ConnectionInfo[]>("get_connection_infos");
+        replaceConnectionInfos(infos ?? []);
+        const stillConnected = (infos ?? []).some(
+          (info) => isSameAddress(info.address, address) && info.rfcomm
+        );
+        if (stillConnected) {
+          setDeviceConnected(address);
           deps.logLine("Disconnect failed (still connected)", "SYS");
         } else {
-          deps.setDisconnected();
+          setDeviceDisconnected(address, { lastError: message });
         }
       } catch (infoErr) {
         deps.logLine(String(infoErr), "SYS");
-        if (previousAddress) {
-          deps.setConnectionState("connected", previousAddress);
-        } else {
-          deps.setConnectionState("idle", null);
-        }
+        setDeviceDisconnected(address, { lastError: message });
       }
-    }
-  }
-
-  function handleConnectResult(result: ConnectResultEvent) {
-    const cachedName = devices.find((d) => d.address === result.address)?.name;
-    if (result.ok) {
-      deps.setConnected(result.address);
-      void (async () => {
-        try {
-          await refreshDevices();
-        } catch (err) {
-          deps.logLine(String(err), "SYS");
-        } finally {
-          const resolvedName =
-            devices.find((d) => d.address === result.address)?.name ??
-            cachedName ??
-            result.address;
-          registerDevice(result.address, resolvedName);
-          if (registerPending === result.address) {
-            deps.logLine(`Device paired: ${resolvedName}`, "SYS");
-            registerPending = null;
-          }
-          deps.logLine(`Connected to ${resolvedName}`, "SYS");
-        }
-      })();
-    } else {
-      if (registerPending === result.address) {
-        deps.logLine(result.error ?? "Pair failed", "SYS");
-        registerPending = null;
-      }
-      if (deps.getConnectedAddress() === result.address) {
-        deps.setDisconnected();
-      } else {
-        deps.setConnectionState("idle", deps.getConnectedAddress());
-      }
-      deps.logLine(result.error ?? "Connect failed", "SYS");
     }
   }
 
   function handleDeviceEvent(payload: DeviceStateEvent) {
     const { address, connected } = payload;
-    const target = devices.find((d) => d.address === address);
-    if (target) {
-      target.connected = connected;
-    }
-    if (deps.getConnectedAddress() === address && !connected) {
-      if (deps.getConnectionState() === "connecting") {
-        return;
-      }
-      deps.setDisconnected();
-    }
+    const target = devices.find((d) => isSameAddress(d.address, address));
+    if (target) target.connected = connected;
 
-    const state = deps.getConnectionState();
-    if (state === "connecting" || state === "disconnecting") {
-      return;
+    if (connected) {
+      setDeviceLinkState(address, true);
+    } else {
+      setDeviceDisconnected(address, { link: false, rfcomm: false, lastError: null });
     }
 
     if (!target) {
@@ -250,21 +357,14 @@ export function initConnectController(deps: ConnectControllerDeps) {
       void (async () => {
         try {
           const latest = await refreshDevicesFromEvent();
-          const found = latest.find((d) => d.address === address);
+          const found = latest.find((d) => isSameAddress(d.address, address));
           if (!found || !found.connected || !found.has_gaia) {
             return;
           }
-          const alreadyRegistered = getRegisteredDevices().some((d) => d.address === address);
+          const alreadyRegistered = getRegisteredDevices().some((d) => isSameAddress(d.address, address));
           registerDevice(address);
           if (!alreadyRegistered) {
             deps.logLine(`Device paired: ${found.name ?? address}`, "SYS");
-          }
-
-          const state = deps.getConnectionState();
-          const current = deps.getConnectedAddress();
-          if (state === "idle" && current !== address) {
-            deps.logLine(`Auto-connect: ${found.name ?? address}`, "SYS");
-            await connectAddress(address);
           }
         } catch (err) {
           deps.logLine(String(err), "SYS");
@@ -277,10 +377,11 @@ export function initConnectController(deps: ConnectControllerDeps) {
     getDevices: () => devices,
     connectAddress,
     addDevice,
-    disconnect,
+    disconnectAddress,
     refreshDevices,
     autoRegisterConnectedGaiaDevices,
-    syncBackendConnection,
+    autoConnectRegisteredDevices,
+    syncBackendConnections,
     handleConnectResult,
     handleDeviceEvent,
     getDeviceLabel,

@@ -5,7 +5,7 @@ import {
   updateDeviceData,
   type DeviceData,
 } from "./telemetry";
-import { getConnectionSnapshot } from "./connection";
+import { getDeviceConnection } from "./connection";
 
 export function getActiveDeviceData() {
   const address = getActiveDeviceAddress();
@@ -21,8 +21,9 @@ export function updateActiveDeviceData(patch: Partial<DeviceData>) {
 
 export function isActiveDeviceConnected() {
   const active = getActiveDeviceAddress();
-  const { state, address } = getConnectionSnapshot();
-  return !!active && state === "connected" && address === active;
+  if (!active) return false;
+  const conn = getDeviceConnection(active);
+  return !!conn && conn.state === "connected" && conn.rfcomm;
 }
 
 export function getActiveDeviceLabel() {

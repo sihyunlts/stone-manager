@@ -9,7 +9,7 @@
         NSLog((@"[STONE][BACK][BT] " fmt), ##__VA_ARGS__);                                            \
     } while (0)
 
-extern void macos_bt_on_data(const uint8_t *data, size_t len);
+extern void macos_bt_on_data(const char *address, const uint8_t *data, size_t len);
 extern void macos_bt_on_device_event(const char *address, int connected);
 
 static IOBluetoothDevice *findDeviceForAddress(NSString *address);
@@ -64,19 +64,25 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
 @property (nonatomic, strong) dispatch_semaphore_t doneSemaphore;
 @end
 
-@interface StoneBluetoothManager : NSObject <IOBluetoothRFCOMMChannelDelegate>
+@interface StoneDeviceSession : NSObject
+@property (nonatomic, copy) NSString *addressKey;
 @property (nonatomic, strong) IOBluetoothDevice *device;
 @property (nonatomic, strong) IOBluetoothRFCOMMChannel *channel;
+@property (nonatomic, assign) BOOL pendingSDPDone;
+@property (nonatomic, assign) IOReturn pendingSDPStatus;
+@end
+
+@interface StoneBluetoothManager : NSObject <IOBluetoothRFCOMMChannelDelegate>
 @property (nonatomic, copy) NSString *lastErrorContext;
 @property (nonatomic, strong) IOBluetoothUserNotification *connectNotification;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, IOBluetoothUserNotification *> *disconnectNotifications;
+@property (nonatomic, strong) NSMutableDictionary<NSString *, StoneDeviceSession *> *sessionsByAddress;
 
 @property (nonatomic, strong) IOBluetoothDeviceInquiry *scanInquiry;
 @property (nonatomic, strong) StoneDeviceInquiryCollector *scanCollector;
+@end
 
-@property (nonatomic, copy) NSString *pendingSDPAddress;
-@property (nonatomic, assign) BOOL pendingSDPDone;
-@property (nonatomic, assign) IOReturn pendingSDPStatus;
+@implementation StoneDeviceSession
 @end
 
 @implementation StoneDeviceInquiryCollector
@@ -155,8 +161,7 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
     self = [super init];
     if (self) {
         _disconnectNotifications = [NSMutableDictionary dictionary];
-        _pendingSDPDone = NO;
-        _pendingSDPStatus = kIOReturnError;
+        _sessionsByAddress = [NSMutableDictionary dictionary];
         _lastErrorContext = @"";
     }
     return self;
@@ -226,6 +231,52 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
     }
 }
 
+- (StoneDeviceSession *)sessionForAddressKey:(NSString *)addressKey createIfNeeded:(BOOL)createIfNeeded {
+    NSString *key = normalizedAddress(addressKey);
+    if (key.length == 0) {
+        return nil;
+    }
+
+    StoneDeviceSession *session = self.sessionsByAddress[key];
+    if (!session && createIfNeeded) {
+        session = [[StoneDeviceSession alloc] init];
+        session.addressKey = key;
+        session.pendingSDPDone = NO;
+        session.pendingSDPStatus = kIOReturnError;
+        self.sessionsByAddress[key] = session;
+    }
+    return session;
+}
+
+- (StoneDeviceSession *)sessionForAddress:(NSString *)address createIfNeeded:(BOOL)createIfNeeded {
+    return [self sessionForAddressKey:normalizedAddress(address) createIfNeeded:createIfNeeded];
+}
+
+- (StoneDeviceSession *)sessionForDevice:(IOBluetoothDevice *)device createIfNeeded:(BOOL)createIfNeeded {
+    if (!device) {
+        return nil;
+    }
+    NSString *address = device.addressString ?: @"";
+    StoneDeviceSession *session = [self sessionForAddress:address createIfNeeded:createIfNeeded];
+    if (session) {
+        session.device = device;
+    }
+    return session;
+}
+
+- (void)removeSessionIfInactive:(NSString *)addressKey {
+    StoneDeviceSession *session = [self sessionForAddressKey:addressKey createIfNeeded:NO];
+    if (!session) {
+        return;
+    }
+
+    BOOL link = session.device && [session.device isConnected];
+    BOOL rfcomm = session.channel && [session.channel isOpen];
+    if (!link && !rfcomm) {
+        [self.sessionsByAddress removeObjectForKey:session.addressKey ?: normalizedAddress(addressKey)];
+    }
+}
+
 - (BOOL)waitForDevice:(IOBluetoothDevice *)device connected:(BOOL)connected timeout:(NSTimeInterval)timeout {
     if (!device) {
         return NO;
@@ -239,28 +290,30 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
     return [device isConnected] == connected;
 }
 
-- (BOOL)disconnectCurrentSessionWithTimeout:(NSTimeInterval)timeout {
-    IOBluetoothRFCOMMChannel *currentChannel = self.channel;
-    IOBluetoothDevice *currentDevice = self.device;
-
-    if (!currentDevice && currentChannel) {
-        currentDevice = [currentChannel getDevice];
+- (BOOL)disconnectSession:(StoneDeviceSession *)session timeout:(NSTimeInterval)timeout {
+    if (!session) {
+        return YES;
     }
 
-    NSString *address = currentDevice.addressString ?: @"";
+    IOBluetoothRFCOMMChannel *channel = session.channel;
+    IOBluetoothDevice *device = session.device;
+    if (!device && channel) {
+        device = [channel getDevice];
+    }
 
-    if (currentChannel) {
+    NSString *address = device.addressString ?: session.addressKey ?: @"";
+    if (channel) {
         BTLOG(@"RFCOMM close (%@)", address);
-        [currentChannel closeChannel];
-        self.channel = nil;
+        [channel closeChannel];
+        session.channel = nil;
     }
 
     BOOL linkDown = YES;
-    if (currentDevice && [currentDevice isConnected]) {
+    if (device && [device isConnected]) {
         BTLOG(@"Link close request: %@", address);
-        IOReturn closeStatus = [currentDevice closeConnection];
+        IOReturn closeStatus = [device closeConnection];
         BTLOG(@"Link close status: %d (%@)", (int)closeStatus, address);
-        linkDown = [self waitForDevice:currentDevice connected:NO timeout:timeout];
+        linkDown = [self waitForDevice:device connected:NO timeout:timeout];
         BTLOG(@"Link disconnected: %@ (%@)", linkDown ? @"YES" : @"NO", address);
     }
 
@@ -268,22 +321,23 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
         [self unregisterDisconnectNotificationForAddress:address];
     }
 
-    self.device = nil;
+    if (linkDown) {
+        session.device = nil;
+        [self removeSessionIfInactive:session.addressKey ?: normalizedAddress(address)];
+    }
     return linkDown;
 }
 
-- (IOReturn)performSDPQueryAndWait:(IOBluetoothDevice *)device timeout:(NSTimeInterval)timeout {
-    if (!device) {
+- (IOReturn)performSDPQueryAndWaitForSession:(StoneDeviceSession *)session timeout:(NSTimeInterval)timeout {
+    IOBluetoothDevice *device = session.device;
+    if (!device || !session) {
         return kIOReturnBadArgument;
     }
 
     NSString *address = device.addressString ?: @"";
-    NSString *key = normalizedAddress(address);
-
-    @synchronized(self) {
-        self.pendingSDPAddress = key;
-        self.pendingSDPDone = NO;
-        self.pendingSDPStatus = kIOReturnError;
+    @synchronized(session) {
+        session.pendingSDPDone = NO;
+        session.pendingSDPStatus = kIOReturnError;
     }
 
     NSDate *prevUpdate = [device getLastServicesUpdate];
@@ -294,10 +348,6 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
     });
     BTLOG(@"SDP query kick: status=%d (%@)", (int)kickStatus, address);
     if (kickStatus != kIOReturnSuccess) {
-        @synchronized(self) {
-            self.pendingSDPAddress = nil;
-            self.pendingSDPDone = NO;
-        }
         return kickStatus;
     }
 
@@ -306,17 +356,12 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
         BOOL done = NO;
         IOReturn doneStatus = kIOReturnError;
 
-        @synchronized(self) {
-            done = self.pendingSDPDone && self.pendingSDPAddress &&
-                   [self.pendingSDPAddress isEqualToString:key];
-            doneStatus = self.pendingSDPStatus;
+        @synchronized(session) {
+            done = session.pendingSDPDone;
+            doneStatus = session.pendingSDPStatus;
         }
 
         if (done) {
-            @synchronized(self) {
-                self.pendingSDPAddress = nil;
-                self.pendingSDPDone = NO;
-            }
             return doneStatus;
         }
 
@@ -328,10 +373,6 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
             BluetoothRFCOMMChannelID channelID = [self resolveGaiaChannelID:device];
             if (channelID != 0) {
                 BTLOG(@"SDP verified by services update (%@, ch=%d)", address, (int)channelID);
-                @synchronized(self) {
-                    self.pendingSDPAddress = nil;
-                    self.pendingSDPDone = NO;
-                }
                 return kIOReturnSuccess;
             }
         }
@@ -339,27 +380,16 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
         [NSThread sleepForTimeInterval:0.05];
     }
 
-    // Guard against a race where completion is posted right as timeout expires.
-    @synchronized(self) {
-        BOOL done = self.pendingSDPDone && self.pendingSDPAddress &&
-                    [self.pendingSDPAddress isEqualToString:key];
-        if (done) {
-            IOReturn doneStatus = self.pendingSDPStatus;
-            self.pendingSDPAddress = nil;
-            self.pendingSDPDone = NO;
-            return doneStatus;
+    @synchronized(session) {
+        if (session.pendingSDPDone) {
+            return session.pendingSDPStatus;
         }
+    }
 
-        BluetoothRFCOMMChannelID fallbackChannel = [self resolveGaiaChannelID:device];
-        if (fallbackChannel != 0) {
-            BTLOG(@"SDP timeout fallback: using known GAIA channel (%@, ch=%d)", address, (int)fallbackChannel);
-            self.pendingSDPAddress = nil;
-            self.pendingSDPDone = NO;
-            return kIOReturnSuccess;
-        }
-
-        self.pendingSDPAddress = nil;
-        self.pendingSDPDone = NO;
+    BluetoothRFCOMMChannelID fallbackChannel = [self resolveGaiaChannelID:device];
+    if (fallbackChannel != 0) {
+        BTLOG(@"SDP timeout fallback: using known GAIA channel (%@, ch=%d)", address, (int)fallbackChannel);
+        return kIOReturnSuccess;
     }
 
     BTLOG(@"SDP query timeout (%@)", address);
@@ -453,9 +483,10 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
     return channelID;
 }
 
-- (IOReturn)openGaiaRFCOMMChannel:(IOBluetoothDevice *)device
-                        channelID:(BluetoothRFCOMMChannelID)channelID {
-    if (!device || channelID == 0) {
+- (IOReturn)openGaiaRFCOMMChannelForSession:(StoneDeviceSession *)session
+                                  channelID:(BluetoothRFCOMMChannelID)channelID {
+    IOBluetoothDevice *device = session.device;
+    if (!session || !device || channelID == 0) {
         return kIOReturnBadArgument;
     }
 
@@ -468,13 +499,18 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
         return status;
     }
 
-    self.channel = openedChannel;
+    session.channel = openedChannel;
     return kIOReturnSuccess;
 }
 
-- (IOReturn)attachGaiaRFCOMMForDevice:(IOBluetoothDevice *)device timeout:(NSTimeInterval)timeout {
+- (IOReturn)attachGaiaRFCOMMForSession:(StoneDeviceSession *)session timeout:(NSTimeInterval)timeout {
+    IOBluetoothDevice *device = session.device;
+    if (!session || !device) {
+        return kIOReturnBadArgument;
+    }
+
     self.lastErrorContext = @"sdp_query";
-    IOReturn sdpStatus = [self performSDPQueryAndWait:device timeout:timeout];
+    IOReturn sdpStatus = [self performSDPQueryAndWaitForSession:session timeout:timeout];
     if (sdpStatus != kIOReturnSuccess) {
         self.lastErrorContext = @"sdp_query_failed";
         return sdpStatus;
@@ -488,21 +524,21 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
         return kIOReturnNotFound;
     }
 
-    if (self.channel) {
-        [self.channel closeChannel];
-        self.channel = nil;
+    if (session.channel) {
+        [session.channel closeChannel];
+        session.channel = nil;
     }
 
     self.lastErrorContext = @"open_rfcomm";
     BTLOG(@"Open RFCOMM: ch=%d (%@)", (int)channelID, device.addressString ?: @"");
-    IOReturn rfcommStatus = [self openGaiaRFCOMMChannel:device channelID:channelID];
+    IOReturn rfcommStatus = [self openGaiaRFCOMMChannelForSession:session channelID:channelID];
     if (rfcommStatus != kIOReturnSuccess) {
         BTLOG(@"RFCOMM open failed on ch=%d: status=%d (%@)", (int)channelID, (int)rfcommStatus, device.addressString ?: @"");
 
         // Match original Android fallback behavior (direct channel 1).
         if (channelID != 1) {
             BTLOG(@"RFCOMM fallback try: ch=1 (%@)", device.addressString ?: @"");
-            IOReturn fallbackStatus = [self openGaiaRFCOMMChannel:device channelID:1];
+            IOReturn fallbackStatus = [self openGaiaRFCOMMChannelForSession:session channelID:1];
             if (fallbackStatus == kIOReturnSuccess) {
                 BTLOG(@"RFCOMM fallback success on ch=1 (%@)", device.addressString ?: @"");
                 return kIOReturnSuccess;
@@ -530,38 +566,6 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
 
     const NSTimeInterval timeout = kStoneOpTimeout;
 
-    if (self.channel && [self.channel isOpen]) {
-        IOBluetoothDevice *channelDevice = [self.channel getDevice];
-        NSString *channelAddress = normalizedAddress(channelDevice.addressString ?: @"");
-
-        if (channelAddress.length > 0 && [channelAddress isEqualToString:targetAddress]) {
-            self.device = channelDevice ?: self.device;
-            [self registerDisconnectNotification:self.device];
-            self.lastErrorContext = @"already_connected";
-            BTLOG(@"RFCOMM already open (%@)", channelAddress);
-            return kIOReturnSuccess;
-        }
-
-        self.lastErrorContext = @"disconnect_stale_session";
-        BTLOG(@"Reset stale RFCOMM session: %@ -> %@", channelAddress, targetAddress);
-        if (![self disconnectCurrentSessionWithTimeout:timeout]) {
-            self.lastErrorContext = @"disconnect_timeout";
-            return kIOReturnTimeout;
-        }
-    }
-
-    if (self.device) {
-        NSString *currentAddress = normalizedAddress(self.device.addressString ?: @"");
-        if (currentAddress.length > 0 && ![currentAddress isEqualToString:targetAddress]) {
-            self.lastErrorContext = @"disconnect_previous_device";
-            BTLOG(@"Reset previous device session: %@ -> %@", currentAddress, targetAddress);
-            if (![self disconnectCurrentSessionWithTimeout:timeout]) {
-                self.lastErrorContext = @"disconnect_timeout";
-                return kIOReturnTimeout;
-            }
-        }
-    }
-
     IOBluetoothDevice *device = findDeviceForAddress(address);
     if (!device) {
         self.lastErrorContext = @"device_not_found";
@@ -569,8 +573,19 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
         return kIOReturnNotFound;
     }
 
-    self.device = device;
+    StoneDeviceSession *session = [self sessionForAddressKey:targetAddress createIfNeeded:YES];
+    if (!session) {
+        self.lastErrorContext = @"invalid_address";
+        return kIOReturnBadArgument;
+    }
+    session.device = device;
     [self registerDisconnectNotification:device];
+
+    if (session.channel && [session.channel isOpen]) {
+        self.lastErrorContext = @"already_connected";
+        BTLOG(@"RFCOMM already open (%@)", device.addressString ?: @"");
+        return kIOReturnSuccess;
+    }
 
     BOOL hadExistingLink = [device isConnected];
     IOReturn linkStatus = [self ensureLinkConnected:device timeout:timeout];
@@ -583,7 +598,7 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
         return authStatus;
     }
 
-    IOReturn attachStatus = [self attachGaiaRFCOMMForDevice:device timeout:timeout];
+    IOReturn attachStatus = [self attachGaiaRFCOMMForSession:session timeout:timeout];
     if (attachStatus != kIOReturnSuccess && hadExistingLink) {
         // App restart can leave a stale baseband link; reset once and retry.
         self.lastErrorContext = @"retry_after_link_reset";
@@ -591,14 +606,14 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
               (int)attachStatus,
               device.addressString ?: @"");
 
-        BOOL down = [self disconnectCurrentSessionWithTimeout:timeout];
+        BOOL down = [self disconnectSession:session timeout:timeout];
         BTLOG(@"Link reset result: %@ (%@)", down ? @"YES" : @"NO", device.addressString ?: @"");
         if (!down) {
             self.lastErrorContext = @"disconnect_timeout";
             return kIOReturnTimeout;
         }
 
-        self.device = device;
+        session.device = device;
         [self registerDisconnectNotification:device];
 
         IOReturn reopenStatus = [self ensureLinkConnected:device timeout:timeout];
@@ -606,7 +621,7 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
             return reopenStatus;
         }
 
-        attachStatus = [self attachGaiaRFCOMMForDevice:device timeout:timeout];
+        attachStatus = [self attachGaiaRFCOMMForSession:session timeout:timeout];
     }
 
     if (attachStatus != kIOReturnSuccess) {
@@ -618,8 +633,25 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
     return kIOReturnSuccess;
 }
 
-- (IOReturn)disconnect {
-    BOOL down = [self disconnectCurrentSessionWithTimeout:3.0];
+- (IOReturn)disconnectAddress:(NSString *)address {
+    NSString *key = normalizedAddress(address);
+    if (key.length == 0) {
+        self.lastErrorContext = @"invalid_address";
+        return kIOReturnBadArgument;
+    }
+
+    StoneDeviceSession *session = [self sessionForAddressKey:key createIfNeeded:NO];
+    if (!session) {
+        IOBluetoothDevice *device = findDeviceForAddress(address);
+        if (!device || ![device isConnected]) {
+            self.lastErrorContext = @"already_disconnected";
+            return kIOReturnSuccess;
+        }
+        session = [self sessionForAddressKey:key createIfNeeded:YES];
+        session.device = device;
+    }
+
+    BOOL down = [self disconnectSession:session timeout:3.0];
     if (down) {
         self.lastErrorContext = @"disconnected";
         return kIOReturnSuccess;
@@ -629,15 +661,17 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
     return kIOReturnTimeout;
 }
 
-- (IOReturn)sendData:(NSData *)data {
+- (IOReturn)sendDataToAddress:(NSString *)address data:(NSData *)data {
     if (!data || data.length == 0) {
         return kIOReturnBadArgument;
     }
-    if (!self.channel || ![self.channel isOpen]) {
+
+    StoneDeviceSession *session = [self sessionForAddress:address createIfNeeded:NO];
+    if (!session || !session.channel || ![session.channel isOpen]) {
         return kIOReturnNotOpen;
     }
 
-    BluetoothRFCOMMMTU mtu = [self.channel getMTU];
+    BluetoothRFCOMMMTU mtu = [session.channel getMTU];
     if (mtu == 0) {
         mtu = 127;
     }
@@ -647,7 +681,7 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
 
     while (remaining > 0) {
         UInt16 chunk = (UInt16)MIN(remaining, (NSUInteger)mtu);
-        IOReturn status = [self.channel writeSync:(void *)bytes length:chunk];
+        IOReturn status = [session.channel writeSync:(void *)bytes length:chunk];
         if (status != kIOReturnSuccess) {
             return status;
         }
@@ -658,30 +692,42 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
     return kIOReturnSuccess;
 }
 
-- (NSDictionary *)currentConnectionInfo {
-    IOBluetoothDevice *device = self.device;
-    if (!device && self.channel) {
-        device = [self.channel getDevice];
+- (NSArray<NSDictionary *> *)currentConnectionInfos {
+    NSMutableArray<NSDictionary *> *entries = [NSMutableArray array];
+    NSMutableArray<NSString *> *pruneKeys = [NSMutableArray array];
+
+    for (NSString *key in self.sessionsByAddress) {
+        StoneDeviceSession *session = self.sessionsByAddress[key];
+        if (!session) {
+            continue;
+        }
+
+        IOBluetoothDevice *device = session.device;
+        if (!device && session.channel) {
+            device = [session.channel getDevice];
+            session.device = device;
+        }
+
+        NSString *address = device.addressString ?: session.addressKey ?: @"";
+        BOOL link = device && [device isConnected];
+        BOOL rfcomm = session.channel && [session.channel isOpen];
+        if (address.length == 0 || (!link && !rfcomm)) {
+            [pruneKeys addObject:key];
+            continue;
+        }
+
+        [entries addObject:@{
+            @"address" : address,
+            @"link" : jsonBool(link),
+            @"rfcomm" : jsonBool(rfcomm)
+        }];
     }
 
-    NSString *address = @"";
-    BOOL link = NO;
-    BOOL rfcomm = NO;
-
-    if (device) {
-        address = device.addressString ?: @"";
-        link = [device isConnected];
+    for (NSString *key in pruneKeys) {
+        [self.sessionsByAddress removeObjectForKey:key];
     }
 
-    if (self.channel) {
-        rfcomm = [self.channel isOpen];
-    }
-
-    return @{
-        @"address" : address,
-        @"link" : jsonBool(link),
-        @"rfcomm" : jsonBool(rfcomm)
-    };
+    return entries;
 }
 
 - (void)deviceConnected:(IOBluetoothUserNotification *)note device:(IOBluetoothDevice *)device {
@@ -695,6 +741,7 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
         return;
     }
 
+    (void)[self sessionForDevice:device createIfNeeded:YES];
     [self registerDisconnectNotification:device];
     macos_bt_on_device_event([address UTF8String], 1);
 }
@@ -718,20 +765,14 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
 
     [self unregisterDisconnectNotificationForAddress:address];
 
-    if (self.channel) {
-        IOBluetoothDevice *channelDevice = [self.channel getDevice];
-        NSString *channelAddress = normalizedAddress(channelDevice.addressString ?: @"");
-        if (channelAddress.length == 0 || [channelAddress isEqualToString:addressKey]) {
+    StoneDeviceSession *session = [self sessionForAddressKey:addressKey createIfNeeded:NO];
+    if (session) {
+        if (session.channel) {
             BTLOG(@"RFCOMM closed by disconnect callback (%@)", address);
-            self.channel = nil;
+            session.channel = nil;
         }
-    }
-
-    if (self.device) {
-        NSString *deviceAddress = normalizedAddress(self.device.addressString ?: @"");
-        if ([deviceAddress isEqualToString:addressKey]) {
-            self.device = nil;
-        }
+        session.device = nil;
+        [self removeSessionIfInactive:addressKey];
     }
 
     macos_bt_on_device_event([address UTF8String], 0);
@@ -741,10 +782,11 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
     NSString *address = device.addressString ?: @"";
     NSString *key = normalizedAddress(address);
 
-    @synchronized(self) {
-        if (!self.pendingSDPAddress || [self.pendingSDPAddress isEqualToString:key]) {
-            self.pendingSDPDone = YES;
-            self.pendingSDPStatus = status;
+    StoneDeviceSession *session = [self sessionForAddressKey:key createIfNeeded:NO];
+    if (session) {
+        @synchronized(session) {
+            session.pendingSDPDone = YES;
+            session.pendingSDPStatus = status;
         }
     }
 
@@ -754,15 +796,38 @@ static char *jsonCStringFromObject(id object, const char *fallbackJson) {
 - (void)rfcommChannelData:(IOBluetoothRFCOMMChannel *)rfcommChannel
                      data:(void *)dataPointer
                    length:(size_t)dataLength {
-    (void)rfcommChannel;
-    if (dataPointer && dataLength > 0) {
-        macos_bt_on_data((const uint8_t *)dataPointer, dataLength);
+    if (!rfcommChannel || !dataPointer || dataLength == 0) {
+        return;
+    }
+
+    IOBluetoothDevice *device = [rfcommChannel getDevice];
+    NSString *address = device.addressString ?: @"";
+    NSString *addressKey = normalizedAddress(address);
+    if (addressKey.length > 0) {
+        StoneDeviceSession *session = [self sessionForAddressKey:addressKey createIfNeeded:YES];
+        session.device = device;
+        session.channel = rfcommChannel;
+    }
+    if (address.length > 0) {
+        macos_bt_on_data([address UTF8String], (const uint8_t *)dataPointer, dataLength);
     }
 }
 
 - (void)rfcommChannelClosed:(IOBluetoothRFCOMMChannel *)rfcommChannel {
-    if (self.channel == rfcommChannel) {
-        self.channel = nil;
+    if (!rfcommChannel) {
+        return;
+    }
+
+    IOBluetoothDevice *device = [rfcommChannel getDevice];
+    NSString *address = device.addressString ?: @"";
+    NSString *addressKey = normalizedAddress(address);
+    StoneDeviceSession *session = [self sessionForAddressKey:addressKey createIfNeeded:NO];
+    if (session && session.channel == rfcommChannel) {
+        session.channel = nil;
+        if (!device || ![device isConnected]) {
+            session.device = nil;
+        }
+        [self removeSessionIfInactive:addressKey];
     }
 }
 
@@ -929,9 +994,15 @@ int macos_bt_sdp_query(const char *address) {
         }
 
         StoneBluetoothManager *manager = [StoneBluetoothManager shared];
-        manager.device = device;
+        StoneDeviceSession *session =
+            [manager sessionForAddress:addr createIfNeeded:YES];
+        if (!session) {
+            manager.lastErrorContext = @"invalid_address";
+            return (int)kIOReturnBadArgument;
+        }
+        session.device = device;
         [manager registerDisconnectNotification:device];
-        return (int)[manager performSDPQueryAndWait:device timeout:kStoneOpTimeout];
+        return (int)[manager performSDPQueryAndWaitForSession:session timeout:kStoneOpTimeout];
     } @catch (NSException *exception) {
         [StoneBluetoothManager shared].lastErrorContext =
             [NSString stringWithFormat:@"exception:%@", exception.name];
@@ -939,18 +1010,18 @@ int macos_bt_sdp_query(const char *address) {
     }
 }
 
-char *macos_bt_get_connection_info(void) {
-    __block NSDictionary *info = nil;
+char *macos_bt_get_connection_infos(void) {
+    __block NSArray<NSDictionary *> *infos = nil;
 
     runOnMainSync(^{
-        info = [[StoneBluetoothManager shared] currentConnectionInfo];
+        infos = [[StoneBluetoothManager shared] currentConnectionInfos];
     });
 
-    if (!info) {
-        return strdup("{\"address\":\"\",\"link\":false,\"rfcomm\":false}");
+    if (!infos) {
+        return strdup("[]");
     }
 
-    return jsonCStringFromObject(info, "{\"address\":\"\",\"link\":false,\"rfcomm\":false}");
+    return jsonCStringFromObject(infos, "[]");
 }
 
 int macos_bt_connect(const char *address) {
@@ -973,9 +1044,18 @@ int macos_bt_connect(const char *address) {
     }
 }
 
-int macos_bt_disconnect(void) {
+int macos_bt_disconnect(const char *address) {
+    if (!address) {
+        return (int)kIOReturnBadArgument;
+    }
+
+    NSString *addr = [NSString stringWithUTF8String:address];
+    if (!addr || addr.length == 0) {
+        return (int)kIOReturnBadArgument;
+    }
+
     @try {
-        IOReturn status = [[StoneBluetoothManager shared] disconnect];
+        IOReturn status = [[StoneBluetoothManager shared] disconnectAddress:addr];
         return (int)status;
     } @catch (NSException *exception) {
         [StoneBluetoothManager shared].lastErrorContext =
@@ -984,8 +1064,13 @@ int macos_bt_disconnect(void) {
     }
 }
 
-int macos_bt_write(const uint8_t *data, size_t len) {
-    if (!data || len == 0) {
+int macos_bt_write(const char *address, const uint8_t *data, size_t len) {
+    if (!address || !data || len == 0) {
+        return (int)kIOReturnBadArgument;
+    }
+
+    NSString *addr = [NSString stringWithUTF8String:address];
+    if (!addr || addr.length == 0) {
         return (int)kIOReturnBadArgument;
     }
 
@@ -994,7 +1079,7 @@ int macos_bt_write(const uint8_t *data, size_t len) {
 
     runOnMainSync(^{
         @try {
-            status = [[StoneBluetoothManager shared] sendData:payload];
+            status = [[StoneBluetoothManager shared] sendDataToAddress:addr data:payload];
         } @catch (NSException *exception) {
             [StoneBluetoothManager shared].lastErrorContext =
                 [NSString stringWithFormat:@"exception:%@", exception.name];

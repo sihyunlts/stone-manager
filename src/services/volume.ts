@@ -32,8 +32,10 @@ export function updateVolumeUI() {
 }
 
 export async function requestVolume() {
+  const address = getActiveDeviceAddress();
+  if (!address) return;
   try {
-    await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0401, payload: [] });
+    await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0401, payload: [] });
     logLine("Volume request (5054 0401)", "OUT");
   } catch (err) {
     logLine(String(err), "SYS");
@@ -41,15 +43,17 @@ export async function requestVolume() {
 }
 
 async function setVolume(value: number) {
+  const address = getActiveDeviceAddress();
+  if (!address) return;
   try {
     const rounded = Math.round(value);
-    await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0201, payload: [rounded] });
+    await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0201, payload: [rounded] });
   } catch (err) {
     logLine(String(err), "SYS");
   }
 }
 
-export function handleVolumePacket(connectedAddress: string | null, dataPayload: number[]) {
+export function handleVolumePacket(connectedAddress: string, dataPayload: number[]) {
   if (dataPayload.length >= 1) {
     if (connectedAddress) updateDeviceData(connectedAddress, { volume: dataPayload[0] });
     if (connectedAddress && connectedAddress === getActiveDeviceAddress()) updateVolumeUI();

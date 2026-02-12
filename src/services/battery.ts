@@ -33,9 +33,11 @@ export function resetBatteryState() {
 }
 
 export async function requestBattery() {
+  const address = getActiveDeviceAddress();
+  if (!address) return;
   try {
-    await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0455, payload: [] });
-    await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0456, payload: [] });
+    await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0455, payload: [] });
+    await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0456, payload: [] });
     logLine("Battery request (5054 0455)", "OUT");
   } catch (err) {
     logLine(String(err), "SYS");
@@ -92,14 +94,14 @@ export function updateBatteryLabel() {
   void invoke("set_tray_battery", { percent, charging: isCharging, full: isFull });
 }
 
-export function handleBatteryStepPacket(connectedAddress: string | null, dataPayload: number[]) {
+export function handleBatteryStepPacket(connectedAddress: string, dataPayload: number[]) {
   if (dataPayload.length >= 1 && connectedAddress) {
     updateDeviceData(connectedAddress, { batteryStep: dataPayload[0] });
     if (connectedAddress === getActiveDeviceAddress()) updateBatteryLabel();
   }
 }
 
-export function handleDcStatePacket(connectedAddress: string | null, dataPayload: number[]) {
+export function handleDcStatePacket(connectedAddress: string, dataPayload: number[]) {
   if (dataPayload.length >= 1 && connectedAddress) {
     updateDeviceData(connectedAddress, { dcState: dataPayload[0] });
     if (connectedAddress === getActiveDeviceAddress()) updateBatteryLabel();

@@ -136,8 +136,10 @@ export function rgbToSlider(r: number, g: number, b: number) {
 }
 
 export async function requestLampState() {
+  const address = getActiveDeviceAddress();
+  if (!address) return;
   try {
-    await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0411, payload: [] });
+    await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0411, payload: [] });
     logLine("Lamp request (5054 0411)", "OUT");
   } catch (err) {
     logLine(String(err), "SYS");
@@ -145,23 +147,32 @@ export async function requestLampState() {
 }
 
 async function setLampBrightness(value: number) {
+  const address = getActiveDeviceAddress();
+  if (!address) return;
   const rounded = Math.round(value);
-  await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0202, payload: [rounded] });
+  await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0202, payload: [rounded] });
 }
 
 async function setLampType(value: number) {
-  await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0203, payload: [value] });
+  const address = getActiveDeviceAddress();
+  if (!address) return;
+  await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0203, payload: [value] });
 }
 
 async function setLampColor(hue: number) {
+  const address = getActiveDeviceAddress();
+  if (!address) return;
   const [r, g, b] = sliderToRgb(hue);
-  await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0204, payload: [r, g, b] });
+  await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0204, payload: [r, g, b] });
 }
 
 async function runLamp(mood: number, type: number, hue: number) {
+  const address = getActiveDeviceAddress();
+  if (!address) return;
   const [r, g, b] = sliderToRgb(hue);
   const rounded = Math.round(mood);
   await invoke("send_gaia_command", {
+    address,
     vendorId: 0x5054,
     commandId: 0x0212,
     payload: [rounded, type, r, g, b],
@@ -169,10 +180,12 @@ async function runLamp(mood: number, type: number, hue: number) {
 }
 
 async function stopLamp() {
-  await invoke("send_gaia_command", { vendorId: 0x5054, commandId: 0x0213, payload: [] });
+  const address = getActiveDeviceAddress();
+  if (!address) return;
+  await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0213, payload: [] });
 }
 
-export function handleLampStatePacket(connectedAddress: string | null, dataPayload: number[]) {
+export function handleLampStatePacket(connectedAddress: string, dataPayload: number[]) {
   if (dataPayload.length < 6) return;
   const lampOn = dataPayload[0] === 1;
   const lampBrightness = dataPayload[1];
