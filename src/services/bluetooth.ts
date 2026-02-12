@@ -57,6 +57,10 @@ type ConnectControllerDeps = {
   onAutoPaired?: (name: string, address: string) => void;
 };
 
+type AddDeviceOptions = {
+  suppressAutoPairedToast?: boolean;
+};
+
 function normalizeAddress(address: string) {
   return address.trim().toLowerCase();
 }
@@ -68,6 +72,7 @@ function isSameAddress(a: string, b: string) {
 export function initConnectController(deps: ConnectControllerDeps) {
   let devices: DeviceInfo[] = [];
   let registerPending: string | null = null;
+  const suppressedAutoPairedToastAddresses = new Set<string>();
   let eventRefreshInFlight = false;
   let eventRefreshPending = false;
   const connectQueue: ConnectQueueItem[] = [];
@@ -82,6 +87,7 @@ export function initConnectController(deps: ConnectControllerDeps) {
 
   function registerDevice(address: string, preferredName?: string) {
     if (!address) return;
+    const normalized = normalizeAddress(address);
     const alreadyRegistered = getRegisteredDevices().some((d) => isSameAddress(d.address, address));
     const latestName =
       preferredName ??
@@ -89,7 +95,10 @@ export function initConnectController(deps: ConnectControllerDeps) {
       address;
     upsertRegisteredDeviceFromStore(address, latestName);
     if (!alreadyRegistered) {
-      deps.onAutoPaired?.(latestName, address);
+      const suppressToast = suppressedAutoPairedToastAddresses.delete(normalized);
+      if (!suppressToast) {
+        deps.onAutoPaired?.(latestName, address);
+      }
     }
   }
 
@@ -128,6 +137,7 @@ export function initConnectController(deps: ConnectControllerDeps) {
       .catch((err) => {
         const message = String(err);
         setDeviceDisconnected(next.address, { lastError: message });
+        suppressedAutoPairedToastAddresses.delete(normalizeAddress(next.address));
         if (registerPending && isSameAddress(registerPending, next.address)) {
           deps.logLine(message, "SYS");
           registerPending = null;
@@ -202,6 +212,7 @@ export function initConnectController(deps: ConnectControllerDeps) {
     } else {
       const message = result.error ?? "Connect failed";
       setDeviceDisconnected(result.address, { lastError: message });
+      suppressedAutoPairedToastAddresses.delete(normalizeAddress(result.address));
 
       if (registerPending && isSameAddress(registerPending, result.address)) {
         deps.logLine(message, "SYS");
@@ -295,10 +306,15 @@ export function initConnectController(deps: ConnectControllerDeps) {
     });
   }
 
-  async function addDevice(address: string) {
+  async function addDevice(address: string, options?: AddDeviceOptions) {
     if (!address) {
       deps.logLine("Select a device to pair", "SYS");
       return;
+    }
+    if (options?.suppressAutoPairedToast) {
+      suppressedAutoPairedToastAddresses.add(normalizeAddress(address));
+    } else {
+      suppressedAutoPairedToastAddresses.delete(normalizeAddress(address));
     }
     registerPending = address;
     enqueueConnect({

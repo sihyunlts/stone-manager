@@ -255,7 +255,7 @@ export function initApp() {
     },
     onPair: async (address) => {
       if (!connectController) return;
-      await connectController.addDevice(address);
+      await connectController.addDevice(address, { suppressAutoPairedToast: true });
     },
     onCancelPairing: async (address) => {
       if (!connectController) return;
