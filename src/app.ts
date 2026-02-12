@@ -4,6 +4,7 @@ import { animate } from "motion";
 import { bindDevPage, renderDevPage } from "./pages/dev";
 import { bindSettingsPage, renderSettingsPage } from "./pages/settings";
 import { initHeaderScrollTitle } from "./components/header";
+import { bindOnboardingPage, renderOnboardingPage } from "./pages/onboarding";
 import {
   initConnectController,
   type DeviceInfo,
@@ -58,12 +59,16 @@ import {
   updateDeviceInfoUI,
 } from "./services/device-info";
 
+const ONBOARDING_SEEN_KEY = "stone.onboarding_seen_v1";
+
 export function initApp() {
+  const shouldShowOnboarding = window.localStorage.getItem(ONBOARDING_SEEN_KEY) !== "1";
   const app = el<HTMLDivElement>("#app");
   app.innerHTML = `
     <div class="app-shell">
       <div id="pageHost">
         ${renderHomePage()}
+        ${renderOnboardingPage()}
         ${renderAddDevicePage()}
         ${renderSettingsPage()}
         ${renderDevPage()}
@@ -83,6 +88,7 @@ export function initApp() {
   const pageSettings = el<HTMLDivElement>("#page-settings");
   const pagePairing = el<HTMLDivElement>("#page-pairing");
   const pageLicenses = el<HTMLDivElement>("#page-licenses");
+  const pageOnboarding = el<HTMLDivElement>("#page-onboarding");
   const appTitle = el<HTMLDivElement>("#appTitle");
   const status = el<HTMLDivElement>("#status");
   const statusAction = el<HTMLButtonElement>("#statusAction");
@@ -98,10 +104,11 @@ export function initApp() {
   let batteryPollingAddress: string | null = null;
   let primedAddress: string | null = null;
   let pendingPairingDebugAction: (() => void) | null = null;
+  let didBootstrapBluetooth = false;
 
   // --- Navigation ---
 
-  const { goTo, goBack, getCurrentPage } = initNavigation({
+  const { goTo, replaceTo, goBack, getCurrentPage } = initNavigation({
     pageHost,
     pages: {
       home: pageHome,
@@ -109,7 +116,9 @@ export function initApp() {
       settings: pageSettings,
       pairing: pagePairing,
       licenses: pageLicenses,
+      onboarding: pageOnboarding,
     },
+    initialPage: shouldShowOnboarding ? "onboarding" : "home",
     onPageChange: (to) => {
       if (to === "settings") {
         addDevicePage?.stopAutoScan();
@@ -133,7 +142,7 @@ export function initApp() {
   });
 
   headerScrollTitle = initHeaderScrollTitle({ collapseRangePx: 56 });
-  headerScrollTitle.syncPage("home");
+  headerScrollTitle.syncPage(getCurrentPage());
 
   // --- Device UI Helpers ---
 
@@ -299,6 +308,24 @@ export function initApp() {
     openPairingPage();
   }
 
+  function bootstrapBluetoothIfNeeded() {
+    if (didBootstrapBluetooth) return;
+    didBootstrapBluetooth = true;
+    connectController?.refreshDevices()
+      .then((devices) => {
+        void devices;
+        addDevicePage?.render();
+        return connectController?.syncBackendConnections();
+      })
+      .then(() => {
+        return connectController?.autoRegisterConnectedGaiaDevices();
+      })
+      .then(() => {
+        return connectController?.autoConnectRegisteredDevices();
+      })
+      .catch((err) => logLine(String(err), "SYS"));
+  }
+
   bindDevPage({
     onSend: async (vendorIdHex, commandIdHex, payloadHex) => {
       const vendorId = parseInt(vendorIdHex, 16);
@@ -332,6 +359,17 @@ export function initApp() {
         addDevicePage?.debugPrepareSyntheticOutcome("fail");
         addDevicePage?.render();
       });
+    },
+    onOpenOnboarding: () => {
+      goTo("onboarding");
+    },
+  });
+
+  bindOnboardingPage({
+    onNext: () => {
+      window.localStorage.setItem(ONBOARDING_SEEN_KEY, "1");
+      bootstrapBluetoothIfNeeded();
+      replaceTo("pairing");
     },
   });
 
@@ -454,17 +492,7 @@ export function initApp() {
   });
   listen<GaiaPacketEvent>("gaia_packet", (event) => handleGaiaPacket(event.payload));
 
-  connectController?.refreshDevices()
-    .then((devices) => {
-      void devices;
-      addDevicePage?.render();
-      return connectController?.syncBackendConnections();
-    })
-    .then(() => {
-      return connectController?.autoRegisterConnectedGaiaDevices();
-    })
-    .then(() => {
-      return connectController?.autoConnectRegisteredDevices();
-    })
-    .catch((err) => logLine(String(err), "SYS"));
+  if (!shouldShowOnboarding) {
+    bootstrapBluetoothIfNeeded();
+  }
 }

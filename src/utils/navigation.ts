@@ -1,16 +1,17 @@
 import { animate } from "motion";
 
-export type PageId = "home" | "dev" | "settings" | "pairing" | "licenses";
+export type PageId = "home" | "dev" | "settings" | "pairing" | "licenses" | "onboarding";
 
 export interface NavigationOptions {
   pageHost: HTMLElement;
   pages: Record<PageId, HTMLElement>;
+  initialPage?: PageId;
   onPageChange?: (to: PageId) => void;
 }
 
 export function initNavigation(options: NavigationOptions) {
-  const { pageHost, pages, onPageChange } = options;
-  let currentPage: PageId = "home";
+  const { pageHost, pages, initialPage = "home", onPageChange } = options;
+  let currentPage: PageId = initialPage;
   let isTransitioning = false;
   const pageHistory: PageId[] = [];
 
@@ -20,8 +21,8 @@ export function initNavigation(options: NavigationOptions) {
     animate(page, { x: "100%" }, { duration: 0 });
   });
   
-  pages.home.style.zIndex = "1";
-  animate(pages.home, { x: "0%" }, { duration: 0 });
+  pages[currentPage].style.zIndex = "1";
+  animate(pages[currentPage], { x: "0%" }, { duration: 0 });
 
   function resetPageStack() {
     Object.values(pages).forEach(page => {
@@ -78,11 +79,16 @@ export function initNavigation(options: NavigationOptions) {
     void navigate(to, "forward");
   }
 
+  function replaceTo(to: PageId) {
+    if (isTransitioning || to === currentPage) return;
+    void navigate(to, "forward");
+  }
+
   function goBack() {
     if (isTransitioning) return;
     const target = pageHistory.pop();
     void navigate(target ?? "home", "back");
   }
 
-  return { goTo, goBack, getCurrentPage: () => currentPage };
+  return { goTo, replaceTo, goBack, getCurrentPage: () => currentPage };
 }

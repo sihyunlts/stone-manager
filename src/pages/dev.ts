@@ -6,6 +6,7 @@ type DevPageHandlers = {
   onSend: (vendorIdHex: string, commandIdHex: string, payloadHex: string) => void | Promise<void>;
   onPairingDebugMockSuccess: () => void;
   onPairingDebugMockFail: () => void;
+  onOpenOnboarding: () => void;
 };
 
 function getInputValue(selector: string) {
@@ -66,6 +67,15 @@ export function renderDevPage() {
       })
     : "";
 
+  const uiDebugSection = renderSection({
+    title: "UI 디버그",
+    body: renderList([
+      renderListItem({
+        body: `<button id="devOpenOnboarding">온보딩 진입</button>`,
+      }),
+    ]),
+  });
+
   return `
     <div class="page" id="page-dev" data-page="dev">
       ${renderHeader({ title: "개발자 메뉴", showBack: true })}
@@ -73,6 +83,7 @@ export function renderDevPage() {
         ${gaiaSection}
         ${stoneInfoSection}
         ${pairingDebugSection}
+        ${uiDebugSection}
       </main>
     </div>
   `;
@@ -101,6 +112,13 @@ export function bindDevPage(handlers: DevPageHandlers) {
   if (pairDebugMockFail) {
     pairDebugMockFail.addEventListener("click", () => {
       handlers.onPairingDebugMockFail();
+    });
+  }
+
+  const devOpenOnboarding = document.querySelector<HTMLButtonElement>("#devOpenOnboarding");
+  if (devOpenOnboarding) {
+    devOpenOnboarding.addEventListener("click", () => {
+      handlers.onOpenOnboarding();
     });
   }
 }
