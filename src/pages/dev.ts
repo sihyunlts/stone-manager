@@ -49,29 +49,20 @@ export function renderDevPage() {
     ]),
   });
 
-  const pairingDebugSection = import.meta.env.DEV
-    ? renderSection({
-        title: "Pairing Flow Debug",
-        body: `
-          ${renderList([
-            renderListItem({
-              body: `
-                <div class="row">
-                  <button id="pairDebugMockSuccess">성공 플로우 진입</button>
-                  <button id="pairDebugMockFail">실패 플로우 진입</button>
-                </div>
-              `,
-            }),
-          ])}
-        `,
-      })
-    : "";
-
   const uiDebugSection = renderSection({
     title: "UI 디버그",
     body: renderList([
       renderListItem({
-        body: `<button id="devOpenOnboarding">온보딩 진입</button>`,
+        label: "온보딩 진입",
+        id: "devOpenOnboarding",
+      }),
+      renderListItem({
+        label: "페어링 성공 플로우 진입",
+        id: "pairDebugMockSuccess",
+      }),
+      renderListItem({
+        label: "페어링 실패 플로우 진입",
+        id: "pairDebugMockFail",
       }),
     ]),
   });
@@ -82,7 +73,6 @@ export function renderDevPage() {
       <main class="layout">
         ${gaiaSection}
         ${stoneInfoSection}
-        ${pairingDebugSection}
         ${uiDebugSection}
       </main>
     </div>
@@ -101,21 +91,21 @@ export function bindDevPage(handlers: DevPageHandlers) {
     });
   }
 
-  const pairDebugMockSuccess = document.querySelector<HTMLButtonElement>("#pairDebugMockSuccess");
+  const pairDebugMockSuccess = document.querySelector<HTMLElement>("#pairDebugMockSuccess");
   if (pairDebugMockSuccess) {
     pairDebugMockSuccess.addEventListener("click", () => {
       handlers.onPairingDebugMockSuccess();
     });
   }
 
-  const pairDebugMockFail = document.querySelector<HTMLButtonElement>("#pairDebugMockFail");
+  const pairDebugMockFail = document.querySelector<HTMLElement>("#pairDebugMockFail");
   if (pairDebugMockFail) {
     pairDebugMockFail.addEventListener("click", () => {
       handlers.onPairingDebugMockFail();
     });
   }
 
-  const devOpenOnboarding = document.querySelector<HTMLButtonElement>("#devOpenOnboarding");
+  const devOpenOnboarding = document.querySelector<HTMLElement>("#devOpenOnboarding");
   if (devOpenOnboarding) {
     devOpenOnboarding.addEventListener("click", () => {
       handlers.onOpenOnboarding();
