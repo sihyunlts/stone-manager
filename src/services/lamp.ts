@@ -12,10 +12,22 @@ let lampHueEl: HTMLInputElement | null = null;
 let lampSettingsEl: HTMLElement | null = null;
 let lampHueContainerEl: HTMLElement | null = null;
 let lampTypeSelect: ReturnType<typeof bindSelect> | null = null;
-let lampDebounce: ReturnType<typeof setTimeout> | null = null;
+const LAMP_BRIGHTNESS_SEND_BUCKET_COUNT = 30;
 const LAMP_HUE_SEND_INTERVAL = 15;
+let lastLampBrightnessAddress: string | null = null;
+let lastLampBrightnessBucket: number | null = null;
 let lastLampColorAddress: string | null = null;
 let lastLampColorBucket: number | null = null;
+
+function toLampBrightnessBucket(value: number) {
+  const clamped = Math.max(0, Math.min(100, value));
+  return Math.round((clamped / 100) * LAMP_BRIGHTNESS_SEND_BUCKET_COUNT);
+}
+
+function fromLampBrightnessBucket(bucket: number) {
+  const clampedBucket = Math.max(0, Math.min(LAMP_BRIGHTNESS_SEND_BUCKET_COUNT, bucket));
+  return (clampedBucket / LAMP_BRIGHTNESS_SEND_BUCKET_COUNT) * 100;
+}
 
 function toHueBucket(value: number) {
   const clamped = Math.max(0, Math.min(360, value));
@@ -71,11 +83,9 @@ export function initLamp() {
     });
     if (value > 0) updateActiveDeviceData({ lampLastNonZero: value });
     updateLampUI();
-    if (lampDebounce) clearTimeout(lampDebounce);
-    lampDebounce = setTimeout(() => {
-      if (!updated || !updated.lampOn || !isActiveDeviceConnected()) return;
+    if (updated && updated.lampOn && isActiveDeviceConnected()) {
       setLampBrightness(value).catch((err) => logLine(String(err), "SYS"));
-    }, 150);
+    }
     updateRangeFill(lampBrightnessEl);
   });
 
@@ -157,8 +167,16 @@ export async function requestLampState() {
 async function setLampBrightness(value: number) {
   const address = getActiveDeviceAddress();
   if (!address) return;
-  const rounded = Math.round(value);
+  const bucket = toLampBrightnessBucket(value);
+  const normalizedAddress = address.toLowerCase();
+  if (lastLampBrightnessAddress === normalizedAddress && lastLampBrightnessBucket === bucket) {
+    return;
+  }
+  const quantized = fromLampBrightnessBucket(bucket);
+  const rounded = Math.round(quantized);
   await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0202, payload: [rounded] });
+  lastLampBrightnessAddress = normalizedAddress;
+  lastLampBrightnessBucket = bucket;
 }
 
 async function setLampType(value: number) {

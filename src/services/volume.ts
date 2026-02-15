@@ -6,7 +6,19 @@ import { updateRangeFill } from "../components/range";
 import { logLine } from "../utils/formatter";
 
 let volumeSliderEl: HTMLInputElement | null = null;
-let volumeDebounce: ReturnType<typeof setTimeout> | null = null;
+const VOLUME_SEND_BUCKET_COUNT = 30;
+let lastVolumeAddress: string | null = null;
+let lastVolumeBucket: number | null = null;
+
+function toVolumeBucket(value: number) {
+  const clamped = Math.max(0, Math.min(30, value));
+  return Math.round((clamped / 30) * VOLUME_SEND_BUCKET_COUNT);
+}
+
+function fromVolumeBucket(bucket: number) {
+  const clampedBucket = Math.max(0, Math.min(VOLUME_SEND_BUCKET_COUNT, bucket));
+  return (clampedBucket / VOLUME_SEND_BUCKET_COUNT) * 30;
+}
 
 export function initVolume() {
   volumeSliderEl = document.querySelector<HTMLInputElement>("#volumeSlider");
@@ -15,11 +27,8 @@ export function initVolume() {
     const value = Number(volumeSliderEl.value);
     updateActiveDeviceData({ volume: value });
     updateVolumeUI();
-    if (volumeDebounce) clearTimeout(volumeDebounce);
-    volumeDebounce = setTimeout(() => {
-      if (!isActiveDeviceConnected()) return;
-      setVolume(value);
-    }, 150);
+    if (!isActiveDeviceConnected()) return;
+    setVolume(value);
   });
 }
 
@@ -46,8 +55,16 @@ async function setVolume(value: number) {
   const address = getActiveDeviceAddress();
   if (!address) return;
   try {
-    const rounded = Math.round(value);
+    const bucket = toVolumeBucket(value);
+    const normalizedAddress = address.toLowerCase();
+    if (lastVolumeAddress === normalizedAddress && lastVolumeBucket === bucket) {
+      return;
+    }
+    const quantized = fromVolumeBucket(bucket);
+    const rounded = Math.round(quantized);
     await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0201, payload: [rounded] });
+    lastVolumeAddress = normalizedAddress;
+    lastVolumeBucket = bucket;
   } catch (err) {
     logLine(String(err), "SYS");
   }
