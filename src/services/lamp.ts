@@ -13,7 +13,7 @@ let lampSettingsEl: HTMLElement | null = null;
 let lampHueContainerEl: HTMLElement | null = null;
 let lampTypeSelect: ReturnType<typeof bindSelect> | null = null;
 const LAMP_BRIGHTNESS_SEND_BUCKET_COUNT = 30;
-const LAMP_HUE_SEND_INTERVAL = 15;
+const LAMP_HUE_SEND_BUCKET_COUNT = 24;
 let lastLampBrightnessAddress: string | null = null;
 let lastLampBrightnessBucket: number | null = null;
 let lastLampColorAddress: string | null = null;
@@ -31,7 +31,12 @@ function fromLampBrightnessBucket(bucket: number) {
 
 function toHueBucket(value: number) {
   const clamped = Math.max(0, Math.min(360, value));
-  return Math.round(clamped / LAMP_HUE_SEND_INTERVAL);
+  return Math.round((clamped / 360) * LAMP_HUE_SEND_BUCKET_COUNT);
+}
+
+function fromHueBucket(bucket: number) {
+  const clampedBucket = Math.max(0, Math.min(LAMP_HUE_SEND_BUCKET_COUNT, bucket));
+  return (clampedBucket / LAMP_HUE_SEND_BUCKET_COUNT) * 360;
 }
 
 export function initLamp() {
@@ -193,7 +198,7 @@ async function setLampColor(hue: number) {
   if (lastLampColorAddress === normalizedAddress && lastLampColorBucket === bucket) {
     return;
   }
-  const quantizedHue = bucket * LAMP_HUE_SEND_INTERVAL;
+  const quantizedHue = fromHueBucket(bucket);
   const [r, g, b] = sliderToRgb(quantizedHue);
   await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0204, payload: [r, g, b] });
   lastLampColorAddress = normalizedAddress;
