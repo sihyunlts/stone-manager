@@ -69,7 +69,6 @@ export function initLamp() {
       lampOn: lampToggleEl.checked,
       lampLastNonZero: nextValue > 0 ? nextValue : currentData.lampLastNonZero,
     });
-    if (nextValue > 0) updateActiveDeviceData({ lampLastNonZero: nextValue });
     updateLampUI();
     if (!updated || !isActiveDeviceConnected()) return;
     if (updated.lampOn) {
@@ -86,12 +85,10 @@ export function initLamp() {
       lampBrightness: value,
       lampLastNonZero: value > 0 ? value : getActiveDeviceData().lampLastNonZero,
     });
-    if (value > 0) updateActiveDeviceData({ lampLastNonZero: value });
     updateLampUI();
     if (updated && updated.lampOn && isActiveDeviceConnected()) {
       setLampBrightness(value).catch((err) => logLine(String(err), "SYS"));
     }
-    updateRangeFill(lampBrightnessEl);
   });
 
   lampHueEl?.addEventListener("input", () => {
