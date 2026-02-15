@@ -13,6 +13,14 @@ let lampSettingsEl: HTMLElement | null = null;
 let lampHueContainerEl: HTMLElement | null = null;
 let lampTypeSelect: ReturnType<typeof bindSelect> | null = null;
 let lampDebounce: ReturnType<typeof setTimeout> | null = null;
+const LAMP_HUE_SEND_INTERVAL = 15;
+let lastLampColorAddress: string | null = null;
+let lastLampColorBucket: number | null = null;
+
+function toHueBucket(value: number) {
+  const clamped = Math.max(0, Math.min(360, value));
+  return Math.round(clamped / LAMP_HUE_SEND_INTERVAL);
+}
 
 export function initLamp() {
   lampToggleEl = document.querySelector<HTMLInputElement>("#lampToggle");
@@ -162,8 +170,16 @@ async function setLampType(value: number) {
 async function setLampColor(hue: number) {
   const address = getActiveDeviceAddress();
   if (!address) return;
-  const [r, g, b] = sliderToRgb(hue);
+  const bucket = toHueBucket(hue);
+  const normalizedAddress = address.toLowerCase();
+  if (lastLampColorAddress === normalizedAddress && lastLampColorBucket === bucket) {
+    return;
+  }
+  const quantizedHue = bucket * LAMP_HUE_SEND_INTERVAL;
+  const [r, g, b] = sliderToRgb(quantizedHue);
   await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0204, payload: [r, g, b] });
+  lastLampColorAddress = normalizedAddress;
+  lastLampColorBucket = bucket;
 }
 
 async function runLamp(mood: number, type: number, hue: number) {
