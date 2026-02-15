@@ -466,6 +466,22 @@ async fn send_gaia_command(address: String, vendor_id: u16, command_id: u16, pay
             ),
         );
         let status = tauri::async_runtime::spawn_blocking(move || -> Result<i32, String> {
+            let ptr = unsafe { macos_bt_get_connection_infos() };
+            if ptr.is_null() {
+                return Err("Target device is not connected".to_string());
+            }
+            let json = unsafe { CString::from_raw(ptr) }
+                .into_string()
+                .map_err(|_| "Invalid connection info encoding".to_string())?;
+            let infos: Vec<ConnectionInfo> =
+                serde_json::from_str(&json).map_err(|e| e.to_string())?;
+            let connected = infos
+                .iter()
+                .any(|info| info.rfcomm && info.address.eq_ignore_ascii_case(&address));
+            if !connected {
+                return Err("Target device is not connected".to_string());
+            }
+
             let frame = gaia_frame(vendor_id, command_id, &payload, 0)?;
             let cstr = CString::new(address).map_err(|_| "Invalid address".to_string())?;
             Ok(unsafe { macos_bt_write(cstr.as_ptr(), frame.as_ptr(), frame.len()) })
