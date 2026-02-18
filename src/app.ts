@@ -27,7 +27,7 @@ import {
   subscribeActiveDevice,
   subscribeRegisteredDevices,
 } from "./state/registry";
-import { renderHomePage } from "./pages/home";
+import { renderHomePage, initHomeConnectionUi } from "./pages/home";
 import { initToast } from "./components/toast";
 import { isActiveDeviceConnected, getActiveDeviceLabel } from "./state/active";
 import { toHex, parseHexBytes, logLine } from "./utils/formatter";
@@ -90,7 +90,9 @@ export function initApp() {
   const pageLicenses = el<HTMLDivElement>("#page-licenses");
   const pageOnboarding = el<HTMLDivElement>("#page-onboarding");
   const appTitle = el<HTMLDivElement>("#appTitle");
+  const statusSection = pageHome.querySelector<HTMLElement>(".statusSection");
   const status = el<HTMLDivElement>("#status");
+  const batteryContainer = el<HTMLElement>("#batteryContainer");
   const statusAction = el<HTMLButtonElement>("#statusAction");
   const statusUnpair = el<HTMLButtonElement>("#statusUnpair");
   const sectionSound = el<HTMLElement>("#sectionSound");
@@ -105,6 +107,13 @@ export function initApp() {
   let primedAddress: string | null = null;
   let pendingPairingDebugAction: (() => void) | null = null;
   let didBootstrapBluetooth = false;
+  const homeConnectionUi = initHomeConnectionUi({
+    pageHome,
+    statusSection,
+    batteryContainer,
+    sectionSound,
+    sectionLamp,
+  });
 
   // --- Navigation ---
 
@@ -171,7 +180,8 @@ export function initApp() {
     });
   }
 
-  function syncActiveDeviceUI() {
+  function syncActiveDeviceUI(options?: { animateHomeConnectionUi?: boolean }) {
+    const animateHomeConnectionUi = options?.animateHomeConnectionUi ?? true;
     updateConnectionStatus();
     updateStatusAction();
     updateDeviceInfoUI();
@@ -200,8 +210,7 @@ export function initApp() {
         primedAddress = null;
       }
     }
-    sectionSound.style.display = connected ? "" : "none";
-    sectionLamp.style.display = connected ? "" : "none";
+    homeConnectionUi.sync(connected, { animate: animateHomeConnectionUi });
     if (settingsStoneInfo) {
       settingsStoneInfo.style.display = connected ? "" : "none";
     }
@@ -461,7 +470,7 @@ export function initApp() {
         exitSpring as any
       ).finished.then(() => {
         renderDeviceTitle(); 
-        syncActiveDeviceUI(); 
+        syncActiveDeviceUI({ animateHomeConnectionUi: false }); 
 
         animate(layout, 
           { 
@@ -474,7 +483,7 @@ export function initApp() {
       });
     } else {
       renderDeviceTitle(); 
-      syncActiveDeviceUI(); 
+      syncActiveDeviceUI({ animateHomeConnectionUi: false }); 
     }
   });
   subscribeConnection(() => { syncActiveDeviceUI(); });

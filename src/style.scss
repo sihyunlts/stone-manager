@@ -298,6 +298,20 @@ body {
   gap: 12px;
 }
 
+#page-home.home--disconnected .layout {
+  justify-content: center;
+}
+
+#page-home .statusSection {
+  will-change: transform;
+}
+
+#page-home .battery-container,
+#page-home #sectionSound,
+#page-home #sectionLamp {
+  will-change: transform, opacity;
+}
+
 .status-actions {
   display: flex;
   gap: 10px;
