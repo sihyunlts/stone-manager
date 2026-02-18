@@ -1,5 +1,6 @@
 import { animate } from "motion";
 import stoneImg from "../assets/stone.png";
+import { renderButton } from "./button";
 
 type ToastHandle = {
   show: (name: string) => void;
@@ -15,7 +16,7 @@ export function initToast(host: HTMLElement): ToastHandle {
       <div class="toast-title" id="toastTitle">STONE</div>
       <img src="${stoneImg}" class="toast-image" alt="STONE" />
       <div class="toast-subtitle">새로운 기기가 등록되었습니다.</div>
-      <button id="toastConfirm">확인</button>
+      ${renderButton({ id: "toastConfirm", text: "확인", tone: "primary" })}
     </div>
   `;
   host.appendChild(wrapper);

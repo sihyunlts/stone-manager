@@ -4,6 +4,7 @@ import { renderToggle } from "../components/toggle";
 import { renderList, renderListItem } from "../components/list";
 import { renderSection } from "../components/section";
 import { renderSelect } from "../components/select";
+import { renderButton } from "../components/button";
 import stoneImg from "../assets/stone.png";
 
 export function renderHomePage() {
@@ -14,12 +15,28 @@ export function renderHomePage() {
         titleId: "appTitle",
         showBack: false,
         right: `
-          <button class="nav-connect" id="navConnect" data-tauri-drag-region="false">
-            <span class="material-symbols-rounded">add_2</span>
-          </button>
-          <button class="nav-info" id="navSettings" data-tauri-drag-region="false">
-            <span class="material-symbols-rounded">settings</span>
-          </button>
+          ${renderButton({
+            id: "navConnect",
+            className: "nav-connect",
+            html: `<span class="material-symbols-rounded">add_2</span>`,
+            kind: "icon",
+            tone: "secondary",
+            attrs: {
+              "data-tauri-drag-region": "false",
+              "aria-label": "기기 추가",
+            },
+          })}
+          ${renderButton({
+            id: "navSettings",
+            className: "nav-info",
+            html: `<span class="material-symbols-rounded">settings</span>`,
+            kind: "icon",
+            tone: "secondary",
+            attrs: {
+              "data-tauri-drag-region": "false",
+              "aria-label": "설정",
+            },
+          })}
         `,
       })}
       <main class="layout">
@@ -30,8 +47,18 @@ export function renderHomePage() {
             <span class="material-symbols-rounded" id="batteryIcon">battery_android_question</span>
             <span class="battery" id="battery">--</span>
           </div>
-          <button class="status-action" id="statusAction">연결</button>
-          <button class="status-action status-unpair" id="statusUnpair">등록 해제</button>
+          <div class="status-actions">
+            ${renderButton({
+              id: "statusAction",
+              text: "연결",
+              tone: "secondary",
+            })}
+            ${renderButton({
+              id: "statusUnpair",
+              text: "등록 해제",
+              tone: "danger",
+            })}
+          </div>
         </section>
 
         ${renderSection({

@@ -1,5 +1,6 @@
 import { animate } from "motion";
 import stoneImg from "../assets/stone.png";
+import { renderButton } from "../components/button";
 import { renderHeader } from "../components/header";
 import type { ConnectResultEvent, DeviceInfo } from "../services/bluetooth";
 
@@ -46,10 +47,15 @@ export function renderAddDevicePage() {
         </div>
 
         <div class="flow-bottom-actions">
-          <button id="pairSelectConnect" class="pair-select-connect">연결</button>
+          ${renderButton({
+            id: "pairSelectConnect",
+            className: "pair-select-connect",
+            text: "연결",
+            tone: "primary",
+          })}
           <div class="pair-flow-actions pair-flow-hidden" id="pairFlowActions">
-            <button id="pairFlowPrimary">확인</button>
-            <button id="pairFlowSecondary">취소</button>
+            ${renderButton({ id: "pairFlowPrimary", text: "확인", tone: "primary" })}
+            ${renderButton({ id: "pairFlowSecondary", text: "취소", tone: "secondary" })}
           </div>
         </div>
       </main>

@@ -67,27 +67,3 @@
     pointer-events: none;
   }
 }
-
-.nav-back,
-.nav-info,
-.nav-connect,
-.nav-refresh {
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color 0.1s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.05);
-  }
-
-  &:active {
-    background: rgba(255, 255, 255, 0.1);
-  }
-}

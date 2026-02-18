@@ -1,3 +1,5 @@
+import { renderButton } from "./button";
+
 type HeaderOptions = {
   title: string;
   titleId?: string;
@@ -33,9 +35,16 @@ export function renderHeader(options: HeaderOptions) {
   const leftSlot = showBack
     ? `
       <div class="header-left">
-        <button class="nav-back" data-tauri-drag-region="false">
-          <span class="material-symbols-rounded">arrow_back</span>
-        </button>
+        ${renderButton({
+          className: "nav-back",
+          html: `<span class="material-symbols-rounded">arrow_back</span>`,
+          kind: "icon",
+          tone: "secondary",
+          attrs: {
+            "data-tauri-drag-region": "false",
+            "aria-label": "뒤로",
+          },
+        })}
       </div>
     `
     : "";

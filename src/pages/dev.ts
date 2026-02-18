@@ -1,6 +1,7 @@
 import { renderHeader } from "../components/header";
 import { renderSection } from "../components/section";
 import { renderList, renderListItem } from "../components/list";
+import { renderButton } from "../components/button";
 
 type DevPageHandlers = {
   onSend: (vendorIdHex: string, commandIdHex: string, payloadHex: string) => void | Promise<void>;
@@ -35,7 +36,7 @@ export function renderDevPage() {
           body: `<input id="payload" placeholder="e.g. 1E or 0A0B0C"/>`,
         }),
         renderListItem({
-          body: `<button id="sendGaia">전송</button>`,
+          body: renderButton({ id: "sendGaia", text: "전송", tone: "primary" }),
         }),
       ])}
     `,

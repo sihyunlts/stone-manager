@@ -1,3 +1,5 @@
+import { renderButton } from "../components/button";
+
 type OnboardingHandlers = {
   onNext: () => void;
 };
@@ -10,7 +12,7 @@ export function renderOnboardingPage() {
           <p class="onboarding-message">STONE 매니저</p>
         </div>
         <div class="flow-bottom-actions">
-          <button id="onboardingNext">시작하기</button>
+          ${renderButton({ id: "onboardingNext", text: "시작하기", tone: "primary" })}
         </div>
       </main>
     </div>

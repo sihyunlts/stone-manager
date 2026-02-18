@@ -1,0 +1,61 @@
+.btn {
+  font-size: 15px;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background-color 0.1s ease, border-color 0.1s ease, color 0.1s ease;
+}
+
+.btn--kind-default {
+  padding: 12px 24px;
+  border-radius: 999px;
+}
+
+.btn--kind-icon {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn--kind-default.btn--tone-primary {
+  background: var(--accent);
+  color: #000;
+}
+
+.btn--kind-default.btn--tone-secondary,
+.btn--kind-default.btn--tone-danger {
+  background: var(--card);
+  color: var(--ink);
+}
+
+.btn--kind-default.btn--tone-danger {
+  color: var(--accent-2);
+}
+
+.btn--kind-icon.btn--tone-primary {
+  background: var(--accent);
+  color: #000;
+}
+
+.btn--kind-icon.btn--tone-secondary,
+.btn--kind-icon.btn--tone-danger {
+  background: transparent;
+  color: var(--muted);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  &:active {
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+
+.btn--kind-icon.btn--tone-danger {
+  color: var(--accent-2);
+}

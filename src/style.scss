@@ -1,3 +1,4 @@
+@use "styles/button";
 @use "styles/header";
 @use "styles/range";
 @use "styles/toggle";
@@ -275,7 +276,7 @@ body {
   display: flex;
   gap: 10px;
 
-  button {
+  .btn {
     width: 100%;
     max-width: none;
   }
@@ -297,13 +298,9 @@ body {
   gap: 12px;
 }
 
-.status-action {
-  margin-top: 8px;
-  min-width: 120px;
-}
-
-.status-unpair {
-  background: var(--accent-2);
+.status-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .battery-container {
@@ -365,8 +362,7 @@ body {
 input[type="text"],
 input[type="number"],
 input[type="password"],
-input:not([type]),
-button {
+input:not([type]) {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px;
@@ -375,18 +371,6 @@ button {
   background: none;
   width: 100%;
   outline: none;
-}
-
-button {
-  background: var(--accent);
-  color: #000;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-
-  &#disconnect {
-    background: var(--accent-2);
-  }
 }
 
 @media (max-width: 720px) {
