@@ -59,6 +59,8 @@ $material-symbols-font-path: "../node_modules/material-symbols/";
   --log-in: #73b9d7;
   --log-out: #df72a0;
   font-family: "Geist Sans", "Pretendard +100", "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+
+  --app-header-height: 64px;
 }
 
 * {
@@ -300,6 +302,7 @@ body {
 
 #page-home.home--disconnected .layout {
   justify-content: center;
+  padding-bottom: calc(var(--app-header-height) + 32px + env(safe-area-inset-bottom));
 }
 
 #page-home .statusSection {
