@@ -37,28 +37,30 @@ export function renderAddDevicePage() {
   return `
     <div class="page" id="page-pairing" data-page="pairing">
       ${renderHeader({ title: "기기 추가", showBack: true })}
-      <main class="layout flow-layout pair-stage pair-stage--select" id="pairingStage">
-        <p class="pair-page-description">STONE의 전원을 켜고 페어링 모드로 전환해 주세요.</p>
-        <div class="pair-select-scroll" id="pairSelectScroll"></div>
+      <div class="layout-shell">
+        <main class="layout flow-layout pair-stage pair-stage--select" id="pairingStage">
+          <p class="pair-page-description">STONE의 전원을 켜고 페어링 모드로 전환해 주세요.</p>
+          <div class="pair-select-scroll" id="pairSelectScroll"></div>
 
-        <div class="pair-card-status pair-flow-hidden" id="pairCardStatus">
-          <div class="pair-flow-title" id="pairFlowTitle">연결 중</div>
-          <div class="pair-flow-message" id="pairFlowMessage">잠시만 기다려 주세요.</div>
-        </div>
-
-        <div class="flow-bottom-actions">
-          ${renderButton({
-            id: "pairSelectConnect",
-            className: "pair-select-connect",
-            text: "연결",
-            tone: "primary",
-          })}
-          <div class="pair-flow-actions pair-flow-hidden" id="pairFlowActions">
-            ${renderButton({ id: "pairFlowPrimary", text: "확인", tone: "primary" })}
-            ${renderButton({ id: "pairFlowSecondary", text: "취소", tone: "secondary" })}
+          <div class="pair-card-status pair-flow-hidden" id="pairCardStatus">
+            <div class="pair-flow-title" id="pairFlowTitle">연결 중</div>
+            <div class="pair-flow-message" id="pairFlowMessage">잠시만 기다려 주세요.</div>
           </div>
-        </div>
-      </main>
+
+          <div class="flow-bottom-actions">
+            ${renderButton({
+              id: "pairSelectConnect",
+              className: "pair-select-connect",
+              text: "연결",
+              tone: "primary",
+            })}
+            <div class="pair-flow-actions pair-flow-hidden" id="pairFlowActions">
+              ${renderButton({ id: "pairFlowPrimary", text: "확인", tone: "primary" })}
+              ${renderButton({ id: "pairFlowSecondary", text: "취소", tone: "secondary" })}
+            </div>
+          </div>
+        </main>
+      </div>
     </div>
   `;
 }

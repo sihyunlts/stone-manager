@@ -68,7 +68,7 @@ $material-symbols-font-path: "../node_modules/material-symbols/";
   scrollbar-width: none;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1, h2, h3, h4, h5, h6, p {
   margin: 0;
 }
 
@@ -106,25 +106,27 @@ body {
   min-width: 0;
 }
 
-.layout {
+.layout-shell {
   width: 100%;
-  padding: 32px 16px 40px;
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
   flex: 1;
   overflow: auto;
   min-width: 0;
 }
 
-/* Full-width scroll area */
-.layout > * {
-  width: min(100%, 480px);
+.layout {
+  max-width: 480px;
   margin: 0 auto;
+  width: 100%;
+  padding: 32px 16px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  min-height: 100%;
+  min-width: 0;
 }
 
 /* Let page content scroll under the header so header translucency/blur is visible. */
-.page > .app-header + .layout {
+.page > .app-header + .layout-shell {
   margin-top: calc(-1 * (32px + var(--app-header-height)));
   padding-top: calc(64px + var(--app-header-height));
 }
@@ -178,7 +180,7 @@ body {
 }
 
 .pair-page-description {
-  margin: 0 6px;
+  padding: 0 6px;
   font-size: 15px;
   color: var(--muted);
 }

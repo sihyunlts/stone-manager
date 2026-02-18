@@ -40,51 +40,52 @@ export function renderHomePage() {
           })}
         `,
       })}
-      <main class="layout">
-        <section class="statusSection">
-          <img src="${stoneImg}" class="device-image"/>
-          <span class="status" id="status">STONE이 연결되지 않음</span>
-          <div class="battery-container" id="batteryContainer">
-            <span class="material-symbols-rounded" id="batteryIcon">battery_android_question</span>
-            <span class="battery" id="battery">--</span>
-          </div>
-          <div class="status-actions">
-            ${renderButton({
-              id: "statusUnpair",
-              text: "등록 해제",
-              tone: "danger",
-            })}
-            ${renderButton({
-              id: "statusAction",
-              text: "연결",
-              tone: "secondary",
-            })}
-          </div>
-        </section>
-
-        ${renderSection({
-          title: "소리",
-          id: "sectionSound",
-          body: `
-            <div class="card">
-              <div class="row volume-row">
-                ${renderRange({ id: "volumeSlider", min: 0, max: 30, step: 0.1, value: 0, icon: "volume_up" })}
-              </div>
+      <div class="layout-shell">
+        <main class="layout">
+          <section class="statusSection">
+            <img src="${stoneImg}" class="device-image"/>
+            <span class="status" id="status">STONE이 연결되지 않음</span>
+            <div class="battery-container" id="batteryContainer">
+              <span class="material-symbols-rounded" id="batteryIcon">battery_android_question</span>
+              <span class="battery" id="battery">--</span>
             </div>
-          `,
-        })}
-        ${renderSection({
-          title: "램프",
-          id: "sectionLamp",
-          body: `
-            ${renderList([
-              renderListItem({
-                label: "램프 사용",
-                right: renderToggle({ id: "lampToggle" }),
-              }),
-            ])}
-            <div id="lampSettings" class="collapsible-group">
+            <div class="status-actions">
+              ${renderButton({
+                id: "statusUnpair",
+                text: "등록 해제",
+                tone: "danger",
+              })}
+              ${renderButton({
+                id: "statusAction",
+                text: "연결",
+                tone: "secondary",
+              })}
+            </div>
+          </section>
+
+          ${renderSection({
+            title: "소리",
+            id: "sectionSound",
+            body: `
+              <div class="card">
+                <div class="row volume-row">
+                  ${renderRange({ id: "volumeSlider", min: 0, max: 30, step: 0.1, value: 0, icon: "volume_up" })}
+                </div>
+              </div>
+            `,
+          })}
+          ${renderSection({
+            title: "램프",
+            id: "sectionLamp",
+            body: `
               ${renderList([
+                renderListItem({
+                  label: "램프 사용",
+                  right: renderToggle({ id: "lampToggle" }),
+                }),
+              ])}
+              <div id="lampSettings" class="collapsible-group">
+                ${renderList([
                 renderListItem({
                   label: "조명 밝기",
                   col: true,
@@ -111,11 +112,12 @@ export function renderHomePage() {
                       </div>
                     `,
                 }),
-              ])}
-            </div>
-          `,
-        })}
-      </main>
+                ])}
+              </div>
+            `,
+          })}
+        </main>
+      </div>
     </div>
   `;
 }

@@ -44,10 +44,12 @@ export function renderSettingsPage() {
   return `
     <div class="page" id="page-settings" data-page="settings">
       ${renderHeader({ title: "설정", showBack: true })}
-      <main class="layout">
-        ${stoneInfo}
-        ${appInfo}
-      </main>
+      <div class="layout-shell">
+        <main class="layout">
+          ${stoneInfo}
+          ${appInfo}
+        </main>
+      </div>
     </div>
   `;
 }

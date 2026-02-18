@@ -71,11 +71,13 @@ export function renderDevPage() {
   return `
     <div class="page" id="page-dev" data-page="dev">
       ${renderHeader({ title: "개발자 메뉴", showBack: true })}
-      <main class="layout">
-        ${gaiaSection}
-        ${stoneInfoSection}
-        ${uiDebugSection}
-      </main>
+      <div class="layout-shell">
+        <main class="layout">
+          ${gaiaSection}
+          ${stoneInfoSection}
+          ${uiDebugSection}
+        </main>
+      </div>
     </div>
   `;
 }

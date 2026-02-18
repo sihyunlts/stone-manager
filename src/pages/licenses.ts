@@ -19,11 +19,13 @@ export function renderLicensesPage() {
   return `
     <div class="page" id="page-licenses" data-page="licenses">
       ${renderHeader({ title: "오픈소스 라이선스", showBack: true })}
-      <main class="layout">
-        <section>
-          ${renderList(items)}
-        </section>
-      </main>
+      <div class="layout-shell">
+        <main class="layout">
+          <section>
+            ${renderList(items)}
+          </section>
+        </main>
+      </div>
     </div>
   `;
 }
