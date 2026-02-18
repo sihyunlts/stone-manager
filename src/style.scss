@@ -119,6 +119,12 @@ body {
   min-width: 0;
 }
 
+/* Let page content scroll under the header so header translucency/blur is visible. */
+.page > .app-header + .layout {
+  margin-top: calc(-1 * (32px + var(--app-header-height)));
+  padding-top: calc(64px + var(--app-header-height));
+}
+
 .device-item.is-selected {
   background: rgba(188, 199, 255, 0.15);
 }
