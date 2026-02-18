@@ -15,6 +15,7 @@ type HeaderScrollTitleOptions = {
 type BoundDynamicHeader = {
   pageId: string;
   headerEl: HTMLElement;
+  scrollEl: HTMLElement;
   layoutEl: HTMLElement;
   collapsedTitleEl: HTMLElement;
   largeTitleEl: HTMLElement;
@@ -75,7 +76,7 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function applyProgress(binding: BoundDynamicHeader, collapseRangePx: number) {
-  const progress = clamp(binding.layoutEl.scrollTop / collapseRangePx, 0, 1);
+  const progress = clamp(binding.scrollEl.scrollTop / collapseRangePx, 0, 1);
   const largeOpacity = 1 - progress;
 
   const isCollapsed = progress >= 1;
@@ -110,6 +111,7 @@ function bindDynamicHeader(
 
   const layoutEl = pageEl.querySelector<HTMLElement>("main.layout");
   if (!layoutEl) return null;
+  const scrollEl = pageEl.querySelector<HTMLElement>(".layout-shell") ?? layoutEl;
 
   const collapsedTitleEl = headerEl.querySelector<HTMLElement>(".app-title--collapsed");
   if (!collapsedTitleEl) return null;
@@ -126,6 +128,7 @@ function bindDynamicHeader(
   const binding: BoundDynamicHeader = {
     pageId,
     headerEl,
+    scrollEl,
     layoutEl,
     collapsedTitleEl,
     largeTitleEl,
@@ -146,7 +149,7 @@ function bindDynamicHeader(
     },
   };
 
-  layoutEl.addEventListener("scroll", binding.onScroll, { passive: true });
+  scrollEl.addEventListener("scroll", binding.onScroll, { passive: true });
   binding.syncNow();
 
   return binding;
