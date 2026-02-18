@@ -115,7 +115,7 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
   let debugSyntheticOutcome: DebugSyntheticOutcome | null = null;
   let debugVirtualDevicesEnabled = false;
 
-  function trackStageAnimation(animation: { cancel: () => void }) {
+  function trackStageAnimation<T extends { cancel: () => void }>(animation: T) {
     stageAnimations.push(animation);
     return animation;
   }
