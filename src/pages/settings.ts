@@ -9,8 +9,9 @@ export function renderSettingsPage() {
     body: renderList([
       renderListItem({
         label: "정밀 배터리 퍼센트 표시",
-        value: "표시되는 값이 실제 잔량과 차이가 날 수 있습니다.",
+        value: "표시 값은 실제 잔량과 다를 수 있습니다.",
         right: renderToggle({ id: "settingsBatteryStepToggle" }),
+        valueVisibleWhenChecked: true,
       }),
     ]),
   });

@@ -50,6 +50,14 @@
   gap: 6px;
 }
 
+.list-item--value-on-checked .list-value--conditional {
+  display: none;
+}
+
+.list-item--value-on-checked:has(.toggle-switch input:checked) .list-value--conditional {
+  display: block;
+}
+
 .list-body {
   width: 100%;
   display: flex;
