@@ -16,32 +16,6 @@ function getInputValue(selector: string) {
 }
 
 export function renderDevPage() {
-  const gaiaSection = renderSection({
-    title: "GAIA 커맨드 전송",
-    body: `
-      ${renderList([
-        renderListItem({
-          label: "벤더 ID (hex)",
-          col: true,
-          body: `<input id="vendorId" value="5054"/>`,
-        }),
-        renderListItem({
-          label: "커맨드 ID (hex)",
-          col: true,
-          body: `<input id="commandId" value="0201"/>`,
-        }),
-        renderListItem({
-          label: "페이로드 (hex)",
-          col: true,
-          body: `<input id="payload" placeholder="e.g. 1E or 0A0B0C"/>`,
-        }),
-        renderListItem({
-          body: renderButton({ id: "sendGaia", text: "전송", tone: "primary" }),
-        }),
-      ])}
-    `,
-  });
-
   const stoneInfoSection = renderSection({
     title: "STONE 정보",
     body: renderList([
@@ -68,14 +42,40 @@ export function renderDevPage() {
     ]),
   });
 
+  const gaiaSection = renderSection({
+    title: "GAIA 커맨드 전송",
+    body: `
+      ${renderList([
+        renderListItem({
+          label: "벤더 ID (hex)",
+          col: true,
+          body: `<input id="vendorId" value="5054"/>`,
+        }),
+        renderListItem({
+          label: "커맨드 ID (hex)",
+          col: true,
+          body: `<input id="commandId" value="0201"/>`,
+        }),
+        renderListItem({
+          label: "페이로드 (hex)",
+          col: true,
+          body: `<input id="payload" placeholder="e.g. 1E or 0A0B0C"/>`,
+        }),
+        renderListItem({
+          body: renderButton({ id: "sendGaia", text: "전송", tone: "primary" }),
+        }),
+      ])}
+    `,
+  });
+
   return `
     <div class="page" id="page-dev" data-page="dev">
       ${renderHeader({ title: "개발자 메뉴", showBack: true })}
       <div class="layout-shell">
         <main class="layout">
-          ${gaiaSection}
           ${stoneInfoSection}
           ${uiDebugSection}
+          ${gaiaSection}
         </main>
       </div>
     </div>
