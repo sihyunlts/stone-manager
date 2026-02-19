@@ -166,6 +166,7 @@ export function initApp() {
     }
     appTitle.innerHTML = renderSelect({
       id: "deviceSelect",
+      className: "select--title",
       options: devices.map((device) => ({
         value: device.address,
         label: device.name ?? device.address,
