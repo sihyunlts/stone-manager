@@ -29,6 +29,28 @@ type HeaderScrollTitleController = {
   syncPage: (pageId: string) => void;
 };
 
+const HEADER_INTERACTIVE_SELECTOR = [
+  "button",
+  "a",
+  "input",
+  "select",
+  "textarea",
+  "[role=\"button\"]",
+  ".select",
+].join(", ");
+
+export function syncHeaderInteractiveNoDrag(root: ParentNode = document) {
+  const headers = Array.from(root.querySelectorAll<HTMLElement>(".app-header"));
+  headers.forEach((header) => {
+    const interactiveNodes = Array.from(
+      header.querySelectorAll<HTMLElement>(HEADER_INTERACTIVE_SELECTOR)
+    );
+    interactiveNodes.forEach((node) => {
+      node.setAttribute("data-tauri-drag-region", "false");
+    });
+  });
+}
+
 export function renderHeader(options: HeaderOptions) {
   const { title, titleId, right, showBack, scrollTitle } = options;
   const resolvedScrollTitle = scrollTitle ?? (showBack ? "dynamic" : "static");
@@ -43,7 +65,6 @@ export function renderHeader(options: HeaderOptions) {
           kind: "icon",
           tone: "secondary",
           attrs: {
-            "data-tauri-drag-region": "false",
             "aria-label": "뒤로",
           },
         })}

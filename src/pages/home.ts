@@ -18,26 +18,24 @@ export function renderHomePage() {
         right: `
           ${renderButton({
             id: "navConnect",
-            className: "nav-connect",
-            html: `<span class="material-symbols-rounded">add_2</span>`,
-            kind: "icon",
-            tone: "secondary",
-            attrs: {
-              "data-tauri-drag-region": "false",
-              "aria-label": "기기 추가",
-            },
-          })}
+              className: "nav-connect",
+              html: `<span class="material-symbols-rounded">add_2</span>`,
+              kind: "icon",
+              tone: "secondary",
+              attrs: {
+                "aria-label": "기기 추가",
+              },
+            })}
           ${renderButton({
             id: "navSettings",
-            className: "nav-info",
-            html: `<span class="material-symbols-rounded">settings</span>`,
-            kind: "icon",
-            tone: "secondary",
-            attrs: {
-              "data-tauri-drag-region": "false",
-              "aria-label": "설정",
-            },
-          })}
+              className: "nav-info",
+              html: `<span class="material-symbols-rounded">settings</span>`,
+              kind: "icon",
+              tone: "secondary",
+              attrs: {
+                "aria-label": "설정",
+              },
+            })}
         `,
       })}
       <div class="layout-shell">

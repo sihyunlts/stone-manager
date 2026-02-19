@@ -4,6 +4,7 @@ import { animate } from "motion";
 import { bindDevPage, renderDevPage } from "./pages/dev";
 import { bindSettingsPage, renderSettingsPage } from "./pages/settings";
 import { initHeaderScrollTitle } from "./components/header";
+import { syncHeaderInteractiveNoDrag } from "./components/header";
 import { bindOnboardingPage, renderOnboardingPage } from "./pages/onboarding";
 import {
   initConnectController,
@@ -76,6 +77,7 @@ export function initApp() {
       </div>
     </div>
   `;
+  syncHeaderInteractiveNoDrag();
   const toast = initToast(app);
 
   const navBackButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-back"));
@@ -154,10 +156,10 @@ export function initApp() {
   // --- Device UI Helpers ---
 
   function renderDeviceTitle() {
-    appTitle.setAttribute("data-tauri-drag-region", "false");
     const devices = getRegisteredDevices();
     if (devices.length === 0) {
       appTitle.textContent = "STONE 매니저";
+      syncHeaderInteractiveNoDrag();
       return;
     }
     const active = getActiveDeviceAddress() ?? devices[0]?.address ?? null;
@@ -176,6 +178,7 @@ export function initApp() {
     bindSelect("deviceSelect", (value) => {
       setActiveDeviceAddress(value);
     });
+    syncHeaderInteractiveNoDrag();
   }
 
   function syncActiveDeviceUI(options?: { animateHomeConnectionUi?: boolean }) {
