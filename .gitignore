@@ -37,5 +37,10 @@ Thumbs.db
 .env.test.local
 .env.production.local
 
+# Agents
+.claude/
+.entire/
+.gemini/
+
 # Orignal
 original/
