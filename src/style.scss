@@ -131,14 +131,6 @@ body {
   padding-top: calc(64px + var(--app-header-height));
 }
 
-.device-item.is-selected {
-  background: rgba(188, 199, 255, 0.15);
-}
-
-.device-item-empty {
-  color: var(--muted);
-}
-
 .flow-layout {
   gap: 24px;
   padding-bottom: 0;
@@ -270,10 +262,6 @@ body {
   display: none !important;
 }
 
-.pair-flow {
-  width: 100%;
-}
-
 .pair-flow-title {
   font-size: 24px;
   font-weight: 600;
@@ -341,13 +329,6 @@ body {
   .material-symbols-rounded {
     font-size: 24px;
   }
-}
-
-.toggle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
 }
 
 .device-image {

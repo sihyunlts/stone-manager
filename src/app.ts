@@ -100,7 +100,6 @@ export function initApp() {
   const settingsStoneInfo = document.querySelector<HTMLElement>("#settingsStoneInfo");
   
   let connectController: ReturnType<typeof initConnectController> | null = null;
-  let deviceSelectBinding: ReturnType<typeof bindSelect> | null = null;
   let addDevicePage: ReturnType<typeof initAddDevicePage> | null = null;
   let headerScrollTitle: ReturnType<typeof initHeaderScrollTitle> | null = null;
   let batteryPollingAddress: string | null = null;
@@ -160,7 +159,6 @@ export function initApp() {
     const devices = getRegisteredDevices();
     if (devices.length === 0) {
       appTitle.textContent = "STONE 매니저";
-      deviceSelectBinding = null;
       return;
     }
     const active = getActiveDeviceAddress() ?? devices[0]?.address ?? null;
@@ -175,7 +173,7 @@ export function initApp() {
       })),
       value: active ?? "",
     });
-    deviceSelectBinding = bindSelect("deviceSelect", (value) => {
+    bindSelect("deviceSelect", (value) => {
       setActiveDeviceAddress(value);
     });
   }

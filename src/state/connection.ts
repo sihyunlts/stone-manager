@@ -48,10 +48,6 @@ function upsert(address: string, patch: Partial<DeviceConnectionState>) {
   return next;
 }
 
-export function getConnectionSnapshot() {
-  return snapshot;
-}
-
 export function getDeviceConnection(address: string | null | undefined) {
   if (!address) return null;
   const key = normalizeAddress(address);
