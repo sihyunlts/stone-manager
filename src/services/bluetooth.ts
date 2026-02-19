@@ -378,6 +378,14 @@ export function initConnectController(deps: ConnectControllerDeps) {
             return;
           }
           const alreadyRegistered = getRegisteredDevices().some((d) => isSameAddress(d.address, address));
+          if (alreadyRegistered) {
+            enqueueConnect({
+              address,
+              reason: "startup",
+              activateOnSuccess: false,
+              quiet: true,
+            });
+          }
           registerDevice(address);
           if (!alreadyRegistered) {
             deps.logLine(`Device paired: ${found.name ?? address}`, "SYS");
