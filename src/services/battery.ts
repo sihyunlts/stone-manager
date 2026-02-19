@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { bindSelect } from "../components/select";
 import { getActiveDeviceAddress } from "../state/registry";
 import { updateDeviceData } from "../state/telemetry";
 import { getActiveDeviceData, isActiveDeviceConnected } from "../state/active";
@@ -8,8 +9,12 @@ let batteryEl: HTMLElement | null = null;
 let batteryIconEl: HTMLSpanElement | null = null;
 let batteryTimer: ReturnType<typeof setInterval> | null = null;
 let batteryStepToggleEl: HTMLInputElement | null = null;
+let batteryPollIntervalSelect: ReturnType<typeof bindSelect> | null = null;
 const BATTERY_LEVEL_DISPLAY_KEY = "stone.battery_level_display_v1";
+const BATTERY_POLL_INTERVAL_KEY = "stone.battery_poll_interval_v1";
+type BatteryPollInterval = "10" | "30" | "60" | "off";
 let useBatteryLevelDisplay = loadBatteryLevelDisplayPreference();
+let batteryPollInterval = loadBatteryPollIntervalPreference();
 
 function clampPercent(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
@@ -43,6 +48,34 @@ function saveBatteryLevelDisplayPreference(next: boolean) {
   }
 }
 
+function normalizeBatteryPollInterval(value: string | number | null | undefined): BatteryPollInterval {
+  const raw = String(value ?? "");
+  if (raw === "10" || raw === "30" || raw === "60" || raw === "off") return raw;
+  return "30";
+}
+
+function loadBatteryPollIntervalPreference() {
+  try {
+    return normalizeBatteryPollInterval(window.localStorage.getItem(BATTERY_POLL_INTERVAL_KEY));
+  } catch {
+    return "30";
+  }
+}
+
+function saveBatteryPollIntervalPreference(next: BatteryPollInterval) {
+  try {
+    window.localStorage.setItem(BATTERY_POLL_INTERVAL_KEY, next);
+  } catch {
+  }
+}
+
+function getBatteryPollIntervalMs() {
+  if (batteryPollInterval === "off") return null;
+  const seconds = Number(batteryPollInterval);
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+  return seconds * 1000;
+}
+
 export function initBattery() {
   batteryEl = document.querySelector<HTMLElement>("#battery");
   batteryIconEl = document.querySelector<HTMLSpanElement>("#batteryIcon");
@@ -56,6 +89,18 @@ export function initBattery() {
       updateBatteryLabel();
     });
   }
+
+  batteryPollIntervalSelect = bindSelect("settingsBatteryPollInterval", (value) => {
+    const next = normalizeBatteryPollInterval(value);
+    batteryPollInterval = next;
+    saveBatteryPollIntervalPreference(next);
+    batteryPollIntervalSelect?.setValue(next, false);
+    startBatteryPolling();
+    if (next !== "off") {
+      void requestBattery();
+    }
+  });
+  batteryPollIntervalSelect?.setValue(batteryPollInterval, false);
 }
 
 export function stopBatteryPolling() {
@@ -67,7 +112,9 @@ export function stopBatteryPolling() {
 
 export function startBatteryPolling() {
   stopBatteryPolling();
-  batteryTimer = setInterval(requestBattery, 30_000);
+  const intervalMs = getBatteryPollIntervalMs();
+  if (!intervalMs) return;
+  batteryTimer = setInterval(requestBattery, intervalMs);
 }
 
 export function resetBatteryState() {

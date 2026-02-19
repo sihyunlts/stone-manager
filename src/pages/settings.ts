@@ -1,6 +1,7 @@
 import { renderHeader } from "../components/header";
 import { renderList, renderListItem } from "../components/list";
 import { renderSection } from "../components/section";
+import { renderSelect } from "../components/select";
 import { renderToggle } from "../components/toggle";
 
 export function renderSettingsPage() {
@@ -12,6 +13,19 @@ export function renderSettingsPage() {
         value: "표시 값은 실제 잔량과 다를 수 있습니다.",
         right: renderToggle({ id: "settingsBatteryStepToggle" }),
         valueVisibleWhenChecked: true,
+      }),
+      renderListItem({
+        label: "배터리 업데이트 주기",
+        right: renderSelect({
+          id: "settingsBatteryPollInterval",
+          options: [
+            { value: "10", label: "10초" },
+            { value: "30", label: "30초" },
+            { value: "60", label: "1분" },
+            { value: "off", label: "수동" },
+          ],
+          value: "30",
+        }),
       }),
     ]),
   });
