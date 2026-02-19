@@ -79,7 +79,6 @@ export function initApp() {
   const toast = initToast(app);
 
   const navBackButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-back"));
-  const navSidebarButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-sidebar"));
   const navConnect = el<HTMLButtonElement>("#navConnect");
   const navSettings = el<HTMLButtonElement>("#navSettings");
   const pageHost = el<HTMLDivElement>("#pageHost");
@@ -421,10 +420,6 @@ export function initApp() {
       goBack();
     })
   );
-  navSidebarButtons.forEach((btn) => {
-    btn.addEventListener("click", () => pageHome.classList.toggle("is-sidebar-collapsed"));
-  });
-
   document.addEventListener("click", (e) => {
     const target = e.target as HTMLElement;
     const item = target.closest("[data-url]") as HTMLElement;
