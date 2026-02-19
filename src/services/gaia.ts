@@ -33,7 +33,7 @@ function dispatchPtPacket(address: string, command: number, dataPayload: number[
 }
 
 export function handleGaiaPacket(p: GaiaPacketEvent) {
-  const dataPayload = p.ack && p.payload.length > 0 ? p.payload.slice(1) : p.payload;
+  const dataPayload = p.payload.length > 0 ? p.payload.slice(1) : p.payload;
   const isAckSuccess = p.ack && p.status === GAIA_STATUS_SUCCESS;
 
   if (p.vendor_id === PT_VENDOR_ID && (!p.ack || isAckSuccess)) {
