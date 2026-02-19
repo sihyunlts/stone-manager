@@ -39,6 +39,15 @@ function setDevInfo(target: HTMLElement | null, value: string) {
   if (target) target.textContent = value;
 }
 
+function parseInt32BE(bytes: number[]) {
+  return (
+    ((bytes[0] & 0xff) << 24) |
+    ((bytes[1] & 0xff) << 16) |
+    ((bytes[2] & 0xff) << 8) |
+    (bytes[3] & 0xff)
+  );
+}
+
 function renderDeviceInfo(address: string | null) {
   if (!address) {
     setDevInfo(devInfoName, "--");
@@ -123,8 +132,8 @@ export function handleDeviceInfoPacket(address: string, command: number, dataPay
   if (command === 0x0454 && dataPayload.length >= 1) {
     state.rssi = (dataPayload[0] & 0x80) ? dataPayload[0] - 256 : dataPayload[0];
   }
-  if (command === 0x0457 && dataPayload.length >= 1) {
-    state.wheel = dataPayload[0];
+  if (command === 0x0457 && dataPayload.length >= 4) {
+    state.wheel = parseInt32BE(dataPayload);
   }
 
   if (getActiveDeviceAddress()?.toLowerCase() === address.toLowerCase()) {
