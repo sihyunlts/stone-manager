@@ -19,9 +19,6 @@ export function renderListItem(options: ListItemOptions) {
   const { label, value, valueId, right, body, col, className, id, link, data } = options;
   const isCol = Boolean(col || body);
   const labelMarkup = label ? `<div class="list-label">${label}</div>` : "";
-  const rowMarkup = right
-    ? `<div class="list-item-row">${labelMarkup}${right}</div>`
-    : labelMarkup;
   const classes = [
     "list-item",
     isCol ? "list-item--col" : "",
@@ -37,18 +34,27 @@ export function renderListItem(options: ListItemOptions) {
         .map(([key, val]) => ` data-${key}="${val}"`)
         .join("")
     : "";
+  const hasValue = valueId !== undefined || value !== undefined;
   const valueContent = value ?? "--";
-  const valueMarkup =
-    valueId !== undefined
-      ? `<div class="list-value" id="${valueId}">${valueContent}</div>`
-      : value !== undefined
-        ? `<div class="list-value">${valueContent}</div>`
-        : "";
+  const valueMarkup = hasValue
+    ? (
+      valueId !== undefined
+        ? `<div class="list-value" id="${valueId}">${valueContent}</div>`
+        : `<div class="list-value">${valueContent}</div>`
+    )
+    : "";
+  const leftMarkup = right && valueMarkup
+    ? `<div class="list-main">${labelMarkup}${valueMarkup}</div>`
+    : labelMarkup;
+  const rowMarkup = right
+    ? `<div class="list-item-row">${leftMarkup}${right}</div>`
+    : labelMarkup;
+  const standaloneValueMarkup = right ? "" : valueMarkup;
   const bodyMarkup = body ? `<div class="list-body">${body}</div>` : "";
   return `
     <div class="${classes}"${idAttr}${dataAttrs}${extraData}>
       ${rowMarkup}
-      ${valueMarkup}
+      ${standaloneValueMarkup}
       ${bodyMarkup}
     </div>
   `;

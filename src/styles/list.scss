@@ -43,6 +43,13 @@
   width: 100%;
 }
 
+.list-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .list-body {
   width: 100%;
   display: flex;
