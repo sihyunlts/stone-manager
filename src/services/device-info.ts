@@ -12,15 +12,10 @@ type DeviceInfoState = {
 };
 
 let devInfoName: HTMLElement | null = null;
-let devInfoFirmware: HTMLElement | null = null;
-let devInfoMac: HTMLElement | null = null;
-let devInfoRssi: HTMLElement | null = null;
 let devInfoWheel: HTMLElement | null = null;
-let infoName: HTMLElement | null = null;
-let infoFirmware: HTMLElement | null = null;
-let infoMac: HTMLElement | null = null;
-let infoRssi: HTMLElement | null = null;
-let infoWheel: HTMLElement | null = null;
+let settingsFirmware: HTMLElement | null = null;
+let settingsMac: HTMLElement | null = null;
+let settingsRssi: HTMLElement | null = null;
 let settingsAppVersion: HTMLElement | null = null;
 
 const stateByAddress = new Map<string, DeviceInfoState>();
@@ -47,42 +42,27 @@ function setDevInfo(target: HTMLElement | null, value: string) {
 function renderDeviceInfo(address: string | null) {
   if (!address) {
     setDevInfo(devInfoName, "--");
-    setDevInfo(devInfoFirmware, "--");
-    setDevInfo(devInfoMac, "--");
-    setDevInfo(devInfoRssi, "--");
     setDevInfo(devInfoWheel, "--");
-    setDevInfo(infoName, "--");
-    setDevInfo(infoFirmware, "--");
-    setDevInfo(infoMac, "--");
-    setDevInfo(infoRssi, "--");
-    setDevInfo(infoWheel, "--");
+    setDevInfo(settingsFirmware, "--");
+    setDevInfo(settingsMac, "--");
+    setDevInfo(settingsRssi, "--");
     return;
   }
 
   const info = stateByAddress.get(address.toLowerCase());
   setDevInfo(devInfoName, info?.name ?? "--");
-  setDevInfo(infoName, info?.name ?? "--");
-  setDevInfo(devInfoFirmware, info?.firmware ?? "--");
-  setDevInfo(infoFirmware, info?.firmware ?? "--");
-  setDevInfo(devInfoMac, info?.mac ?? "--");
-  setDevInfo(infoMac, info?.mac ?? "--");
-  setDevInfo(devInfoRssi, info?.rssi === null || info?.rssi === undefined ? "--" : `${info.rssi} dBm`);
-  setDevInfo(infoRssi, info?.rssi === null || info?.rssi === undefined ? "--" : `${info.rssi} dBm`);
   setDevInfo(devInfoWheel, info?.wheel === null || info?.wheel === undefined ? "--" : String(info.wheel));
-  setDevInfo(infoWheel, info?.wheel === null || info?.wheel === undefined ? "--" : String(info.wheel));
+  setDevInfo(settingsFirmware, info?.firmware ?? "--");
+  setDevInfo(settingsMac, info?.mac ?? "--");
+  setDevInfo(settingsRssi, info?.rssi === null || info?.rssi === undefined ? "--" : `${info.rssi} dBm`);
 }
 
 export function initDeviceInfo() {
   devInfoName = document.querySelector<HTMLElement>("#devInfoName");
-  devInfoFirmware = document.querySelector<HTMLElement>("#devInfoFirmware");
-  devInfoMac = document.querySelector<HTMLElement>("#devInfoMac");
-  devInfoRssi = document.querySelector<HTMLElement>("#devInfoRssi");
   devInfoWheel = document.querySelector<HTMLElement>("#devInfoWheel");
-  infoName = document.querySelector<HTMLElement>("#settingsName");
-  infoFirmware = document.querySelector<HTMLElement>("#settingsFirmware");
-  infoMac = document.querySelector<HTMLElement>("#settingsMac");
-  infoRssi = document.querySelector<HTMLElement>("#settingsRssi");
-  infoWheel = document.querySelector<HTMLElement>("#settingsWheel");
+  settingsFirmware = document.querySelector<HTMLElement>("#settingsFirmware");
+  settingsMac = document.querySelector<HTMLElement>("#settingsMac");
+  settingsRssi = document.querySelector<HTMLElement>("#settingsRssi");
   settingsAppVersion = document.querySelector<HTMLElement>("#settingsAppVersion");
   loadAppVersion().catch(() => {});
   updateDeviceInfoUI();
