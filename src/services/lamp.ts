@@ -124,6 +124,14 @@ export function updateLampUI() {
   }
 }
 
+export function resetLampState() {
+  const address = getActiveDeviceAddress();
+  if (address) {
+    updateDeviceData(address, { lampOn: false });
+  }
+  updateLampUI();
+}
+
 export function sliderToRgb(value: number) {
   const v = Math.max(0, Math.min(360, value));
   const whiteBand = 20;

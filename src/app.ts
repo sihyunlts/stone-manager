@@ -51,6 +51,7 @@ import {
 import {
   initLamp,
   requestLampState,
+  resetLampState,
   updateLampUI,
 } from "./services/lamp";
 import {
@@ -207,6 +208,7 @@ export function initApp() {
       stopBatteryPolling();
       batteryPollingAddress = null;
       resetBatteryState();
+      resetLampState();
       if (!active || active === primedAddress) {
         primedAddress = null;
       }
