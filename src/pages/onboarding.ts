@@ -7,6 +7,7 @@ type OnboardingHandlers = {
 export function renderOnboardingPage() {
   return `
     <div class="page" id="page-onboarding" data-page="onboarding">
+      <div class="window-drag-handle" data-tauri-drag-region aria-hidden="true"></div>
       <div class="layout-shell">
         <main class="layout flow-layout">
           <div class="onboarding-content">
