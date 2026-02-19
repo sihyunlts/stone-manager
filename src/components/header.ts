@@ -12,13 +12,14 @@ type HeaderScrollTitleOptions = {
   collapseRangePx?: number;
 };
 
-type BoundDynamicHeader = {
+type BoundHeader = {
   pageId: string;
   headerEl: HTMLElement;
   scrollEl: HTMLElement;
-  layoutEl: HTMLElement;
-  collapsedTitleEl: HTMLElement;
-  largeTitleEl: HTMLElement;
+  dynamicTitle?: {
+    collapsedTitleEl: HTMLElement;
+    largeTitleEl: HTMLElement;
+  };
   rafId: number | null;
   onScroll: () => void;
   syncNow: () => void;
@@ -75,16 +76,25 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function applyProgress(binding: BoundDynamicHeader, collapseRangePx: number) {
+function applyProgress(binding: BoundHeader, collapseRangePx: number) {
+  const isScrolled = binding.scrollEl.scrollTop > 0;
+  binding.headerEl.classList.toggle("is-scrolled", isScrolled);
+
+  const dynamicTitle = binding.dynamicTitle;
+  if (!dynamicTitle) {
+    binding.headerEl.classList.remove("is-title-collapsed");
+    return;
+  }
+
   const progress = clamp(binding.scrollEl.scrollTop / collapseRangePx, 0, 1);
   const largeOpacity = 1 - progress;
 
   const isCollapsed = progress >= 1;
   binding.headerEl.classList.toggle("is-title-collapsed", isCollapsed);
-  binding.collapsedTitleEl.style.opacity = "";
-  binding.collapsedTitleEl.style.transform = "";
-  binding.largeTitleEl.style.opacity = `${largeOpacity}`;
-  binding.largeTitleEl.style.transform = "";
+  dynamicTitle.collapsedTitleEl.style.opacity = "";
+  dynamicTitle.collapsedTitleEl.style.transform = "";
+  dynamicTitle.largeTitleEl.style.opacity = `${largeOpacity}`;
+  dynamicTitle.largeTitleEl.style.transform = "";
 }
 
 function ensureLargeTitle(layoutEl: HTMLElement, title: string) {
@@ -102,36 +112,40 @@ function ensureLargeTitle(layoutEl: HTMLElement, title: string) {
   return largeTitle;
 }
 
-function bindDynamicHeader(
+function bindHeader(
   pageEl: HTMLElement,
   collapseRangePx: number
-): BoundDynamicHeader | null {
-  const headerEl = pageEl.querySelector<HTMLElement>(".app-header[data-scroll-title=\"dynamic\"]");
+): BoundHeader | null {
+  const headerEl = pageEl.querySelector<HTMLElement>(".app-header");
   if (!headerEl) return null;
-
-  const layoutEl = pageEl.querySelector<HTMLElement>("main.layout");
-  if (!layoutEl) return null;
-  const scrollEl = pageEl.querySelector<HTMLElement>(".layout-shell") ?? layoutEl;
-
-  const collapsedTitleEl = headerEl.querySelector<HTMLElement>(".app-title--collapsed");
-  if (!collapsedTitleEl) return null;
 
   const pageId = pageEl.dataset.page ?? "";
   if (!pageId) return null;
 
-  const title = headerEl.dataset.headerTitle ?? collapsedTitleEl.textContent?.trim() ?? "";
-  if (!title) return null;
+  const layoutEl = pageEl.querySelector<HTMLElement>("main.layout");
+  const scrollEl = pageEl.querySelector<HTMLElement>(".layout-shell") ?? layoutEl;
+  if (!scrollEl) return null;
 
-  const largeTitleEl = ensureLargeTitle(layoutEl, title);
-  layoutEl.classList.add("has-dynamic-header-title");
+  let dynamicTitle: BoundHeader["dynamicTitle"];
+  const isDynamicScrollTitle = headerEl.dataset.scrollTitle === "dynamic";
+  if (isDynamicScrollTitle && layoutEl) {
+    const collapsedTitleEl = headerEl.querySelector<HTMLElement>(".app-title--collapsed");
+    const title = headerEl.dataset.headerTitle ?? collapsedTitleEl?.textContent?.trim() ?? "";
+    if (collapsedTitleEl && title) {
+      const largeTitleEl = ensureLargeTitle(layoutEl, title);
+      layoutEl.classList.add("has-dynamic-header-title");
+      dynamicTitle = {
+        collapsedTitleEl,
+        largeTitleEl,
+      };
+    }
+  }
 
-  const binding: BoundDynamicHeader = {
+  const binding: BoundHeader = {
     pageId,
     headerEl,
     scrollEl,
-    layoutEl,
-    collapsedTitleEl,
-    largeTitleEl,
+    dynamicTitle,
     rafId: null,
     onScroll: () => {
       if (binding.rafId !== null) return;
@@ -160,10 +174,10 @@ export function initHeaderScrollTitle(
 ): HeaderScrollTitleController {
   const collapseRangePx = Math.max(1, options.collapseRangePx ?? 56);
   const pageNodes = Array.from(document.querySelectorAll<HTMLElement>(".page"));
-  const bindingsByPageId = new Map<string, BoundDynamicHeader>();
+  const bindingsByPageId = new Map<string, BoundHeader>();
 
   pageNodes.forEach((pageEl) => {
-    const binding = bindDynamicHeader(pageEl, collapseRangePx);
+    const binding = bindHeader(pageEl, collapseRangePx);
     if (!binding) return;
     bindingsByPageId.set(binding.pageId, binding);
   });
