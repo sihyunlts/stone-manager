@@ -50,10 +50,16 @@ export function initLamp() {
     const next = Number(value);
     const data = updateActiveDeviceData({ lampType: next });
     if (!data || !data.lampOn) return;
-    setLampType(next).catch((err) => logLine(String(err), "SYS"));
-    if (next === 1) {
-      setLampColor(data.lampHue).catch((err) => logLine(String(err), "SYS"));
-    }
+    void (async () => {
+      try {
+        await setLampType(next);
+        if (next === 1) {
+          await setLampColor(data.lampHue, { force: true });
+        }
+      } catch (err) {
+        logLine(String(err), "SYS");
+      }
+    })();
     updateLampUI();
   });
 
@@ -195,12 +201,12 @@ async function setLampType(value: number) {
   await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0203, payload: [value] });
 }
 
-async function setLampColor(hue: number) {
+async function setLampColor(hue: number, options?: { force?: boolean }) {
   const address = getActiveDeviceAddress();
   if (!address) return;
   const bucket = toHueBucket(hue);
   const normalizedAddress = address.toLowerCase();
-  if (lastLampColorAddress === normalizedAddress && lastLampColorBucket === bucket) {
+  if (!options?.force && lastLampColorAddress === normalizedAddress && lastLampColorBucket === bucket) {
     return;
   }
   const quantizedHue = fromHueBucket(bucket);
