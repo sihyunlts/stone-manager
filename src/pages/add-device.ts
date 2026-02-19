@@ -56,7 +56,6 @@ export function renderAddDevicePage() {
             })}
             <div class="pair-flow-actions pair-flow-hidden" id="pairFlowActions">
               ${renderButton({ id: "pairFlowPrimary", text: "확인", tone: "primary" })}
-              ${renderButton({ id: "pairFlowSecondary", text: "취소", tone: "secondary" })}
             </div>
           </div>
         </main>
@@ -99,7 +98,6 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
   const flowMessage = document.querySelector<HTMLElement>("#pairFlowMessage");
   const flowActions = document.querySelector<HTMLElement>("#pairFlowActions");
   const flowPrimary = document.querySelector<HTMLButtonElement>("#pairFlowPrimary");
-  const flowSecondary = document.querySelector<HTMLButtonElement>("#pairFlowSecondary");
 
   let selected = "";
   let cachedUnpairedStoneDevices: DeviceInfo[] = [];
@@ -210,7 +208,6 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
       if (flowMessage) flowMessage.textContent = `${deviceText} 기기에 연결하고 있어요.`;
       flowActions?.classList.add("pair-flow-hidden");
       if (flowPrimary) flowPrimary.style.display = "none";
-      if (flowSecondary) flowSecondary.style.display = "none";
       return;
     }
 
@@ -222,7 +219,6 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
         flowPrimary.style.display = "";
         flowPrimary.textContent = "확인";
       }
-      if (flowSecondary) flowSecondary.style.display = "none";
       return;
     }
 
@@ -233,7 +229,6 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
       flowPrimary.style.display = "";
       flowPrimary.textContent = "다시 선택";
     }
-    if (flowSecondary) flowSecondary.style.display = "none";
   }
 
   function transitionToFlow() {
@@ -607,12 +602,6 @@ export function initAddDevicePage(handlers: AddDeviceHandlers) {
     }
     if (flowStage === "fail") {
       resetFlow();
-    }
-  });
-
-  flowSecondary?.addEventListener("click", () => {
-    if (flowStage === "connecting") {
-      handleBackWhileConnecting();
     }
   });
 
