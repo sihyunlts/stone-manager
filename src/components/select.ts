@@ -19,6 +19,12 @@ type SelectBinding = {
   setOptions: (options: SelectOption[], value?: string | number, emit?: boolean) => void;
 };
 
+type SelectCleanup = {
+  destroy: () => void;
+};
+
+const bindingCleanupById = new Map<string, SelectCleanup>();
+
 export function renderSelect(options: SelectOptions) {
   const { id, options: items, value, className, direction = "down" } = options;
   const classes = ["select", className].filter(Boolean).join(" ");
@@ -49,6 +55,9 @@ export function renderSelect(options: SelectOptions) {
 }
 
 export function bindSelect(id: string, onChange: (value: string) => void): SelectBinding | null {
+  bindingCleanupById.get(id)?.destroy();
+  bindingCleanupById.delete(id);
+
   const root = document.querySelector<HTMLElement>(`#${id}`);
   if (!root) return null;
   const trigger = root.querySelector<HTMLButtonElement>(".select-trigger");
@@ -167,7 +176,7 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
     setValue(currentValue, emit);
   }
 
-  trigger.addEventListener("click", (event) => {
+  const handleTriggerClick = (event: MouseEvent) => {
     event.stopPropagation();
     const isOpen = root.classList.contains("is-open");
     
@@ -182,11 +191,22 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
       });
       openMenu();
     }
-  });
+  };
+
+  const handleDocumentClick = () => {
+    closeMenu();
+  };
+
+  trigger.addEventListener("click", handleTriggerClick);
 
   bindOptions();
-  document.addEventListener("click", () => {
-    closeMenu();
+  document.addEventListener("click", handleDocumentClick);
+
+  bindingCleanupById.set(id, {
+    destroy: () => {
+      trigger.removeEventListener("click", handleTriggerClick);
+      document.removeEventListener("click", handleDocumentClick);
+    },
   });
 
   return { setValue, setOptions };
