@@ -1,8 +1,20 @@
 import { renderHeader } from "../components/header";
 import { renderList, renderListItem } from "../components/list";
 import { renderSection } from "../components/section";
+import { renderToggle } from "../components/toggle";
 
 export function renderSettingsPage() {
+  const stoneSettings = renderSection({
+    title: "앱 설정",
+    body: renderList([
+      renderListItem({
+        label: "정밀 배터리 퍼센트 표시",
+        value: "표시되는 값이 실제 잔량과 차이가 날 수 있습니다.",
+        right: renderToggle({ id: "settingsBatteryStepToggle" }),
+      }),
+    ]),
+  });
+
   const stoneInfo = renderSection({
     title: "STONE 정보",
     id: "settingsStoneInfo",
@@ -46,6 +58,7 @@ export function renderSettingsPage() {
       ${renderHeader({ title: "설정", showBack: true })}
       <div class="layout-shell">
         <main class="layout">
+          ${stoneSettings}
           ${stoneInfo}
           ${appInfo}
         </main>

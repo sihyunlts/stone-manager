@@ -1,5 +1,6 @@
 export type DeviceData = {
   batteryStep: number | null;
+  batteryLevel: number | null;
   dcState: number | null;
   volume: number | null;
   lampOn: boolean;
@@ -11,6 +12,7 @@ export type DeviceData = {
 
 const DEFAULT_DATA: DeviceData = {
   batteryStep: null,
+  batteryLevel: null,
   dcState: null,
   volume: null,
   lampOn: false,

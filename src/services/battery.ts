@@ -7,11 +7,55 @@ import { logLine } from "../utils/formatter";
 let batteryEl: HTMLElement | null = null;
 let batteryIconEl: HTMLSpanElement | null = null;
 let batteryTimer: ReturnType<typeof setInterval> | null = null;
+let batteryStepToggleEl: HTMLInputElement | null = null;
+const BATTERY_LEVEL_DISPLAY_KEY = "stone.battery_level_display_v1";
+let useBatteryLevelDisplay = loadBatteryLevelDisplayPreference();
+
+function clampPercent(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function clampBatteryStep(step: number) {
+  return Math.max(0, Math.min(5, Math.round(step)));
+}
+
+function batteryStepToPercent(step: number) {
+  const s = clampBatteryStep(step);
+  if (s <= 1) return 20;
+  if (s === 2) return 40;
+  if (s === 3) return 60;
+  if (s === 4) return 80;
+  return 100;
+}
+
+function loadBatteryLevelDisplayPreference() {
+  try {
+    return window.localStorage.getItem(BATTERY_LEVEL_DISPLAY_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveBatteryLevelDisplayPreference(next: boolean) {
+  try {
+    window.localStorage.setItem(BATTERY_LEVEL_DISPLAY_KEY, next ? "1" : "0");
+  } catch {
+  }
+}
 
 export function initBattery() {
   batteryEl = document.querySelector<HTMLElement>("#battery");
   batteryIconEl = document.querySelector<HTMLSpanElement>("#batteryIcon");
   batteryEl?.addEventListener("click", requestBattery);
+  batteryStepToggleEl = document.querySelector<HTMLInputElement>("#settingsBatteryStepToggle");
+  if (batteryStepToggleEl) {
+    batteryStepToggleEl.checked = useBatteryLevelDisplay;
+    batteryStepToggleEl.addEventListener("change", () => {
+      useBatteryLevelDisplay = !!batteryStepToggleEl?.checked;
+      saveBatteryLevelDisplayPreference(useBatteryLevelDisplay);
+      updateBatteryLabel();
+    });
+  }
 }
 
 export function stopBatteryPolling() {
@@ -52,25 +96,30 @@ export function updateBatteryLabel() {
     void invoke("set_tray_battery", { percent: null, charging: false, full: false });
     return;
   }
-  const { batteryStep, dcState } = getActiveDeviceData();
-  if (batteryStep === null) {
+  const { batteryStep, batteryLevel, dcState } = getActiveDeviceData();
+  const percent = useBatteryLevelDisplay
+    ? (
+      batteryLevel !== null
+        ? clampPercent(batteryLevel)
+        : batteryStep !== null
+          ? batteryStepToPercent(batteryStep)
+          : null
+    )
+    : (
+      batteryStep !== null
+        ? batteryStepToPercent(batteryStep)
+        : null
+    );
+
+  if (percent === null) {
     batteryEl.textContent = "--";
     batteryIconEl.textContent = "battery_android_question";
     void invoke("set_tray_battery", { percent: null, charging: false, full: false });
     return;
   }
-  let percent: number;
-  switch (batteryStep) {
-    case 0:
-    case 1: percent = 20; break;
-    case 2: percent = 40; break;
-    case 3: percent = 60; break;
-    case 4: percent = 80; break;
-    case 5: percent = 100; break;
-    default: percent = batteryStep; break;
-  }
+
   let suffix = "";
-  const isFull = dcState === 1 && batteryStep === 5;
+  const isFull = dcState === 1 && percent >= 100;
   const isCharging = dcState === 3;
   let icon = "battery_android_question";
 
@@ -96,7 +145,13 @@ export function updateBatteryLabel() {
 
 export function handleBatteryStepPacket(connectedAddress: string, dataPayload: number[]) {
   if (dataPayload.length >= 1 && connectedAddress) {
-    updateDeviceData(connectedAddress, { batteryStep: dataPayload[0] });
+    const patch: { batteryStep: number; batteryLevel?: number } = {
+      batteryStep: dataPayload[0],
+    };
+    if (dataPayload.length >= 2) {
+      patch.batteryLevel = clampPercent(dataPayload[1]);
+    }
+    updateDeviceData(connectedAddress, patch);
     if (connectedAddress === getActiveDeviceAddress()) updateBatteryLabel();
   }
 }
