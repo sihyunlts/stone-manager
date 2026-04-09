@@ -74,7 +74,7 @@ import {
 const ONBOARDING_SEEN_KEY = "stone.onboarding_seen_v1";
 
 function shouldBootstrapBluetoothOnLaunch() {
-  return !/Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent);
+  return !/iPhone|iPad|iPod/i.test(window.navigator.userAgent);
 }
 
 export function initApp() {

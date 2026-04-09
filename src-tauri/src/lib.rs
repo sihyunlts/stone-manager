@@ -1,10 +1,14 @@
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::ffi::{CStr, CString};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter};
+
+#[cfg(target_os = "android")]
+mod android_backend;
+#[cfg(target_os = "macos")]
+use std::ffi::{CStr, CString};
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
@@ -14,7 +18,7 @@ use tauri::tray::{TrayIcon, TrayIconBuilder};
 use tauri::{Manager, WindowEvent, Wry};
 
 #[derive(Serialize, Deserialize, Clone)]
-struct BluetoothDeviceInfo {
+pub(crate) struct BluetoothDeviceInfo {
     name: String,
     address: String,
     connected: bool,
@@ -28,7 +32,7 @@ fn default_true() -> bool {
 }
 
 #[derive(Serialize, Clone)]
-struct GaiaPacketEvent {
+pub(crate) struct GaiaPacketEvent {
     address: String,
     vendor_id: u16,
     command_id: u16,
@@ -40,14 +44,14 @@ struct GaiaPacketEvent {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-struct ConnectionInfo {
+pub(crate) struct ConnectionInfo {
     address: String,
     link: bool,
     rfcomm: bool,
 }
 
 #[derive(Serialize, Clone)]
-struct DeviceStateEvent {
+pub(crate) struct DeviceStateEvent {
     address: String,
     connected: bool,
 }
@@ -195,6 +199,7 @@ fn gaia_frame(
     Ok(frame)
 }
 
+#[cfg(target_os = "macos")]
 fn ioreturn_name(code: i32) -> &'static str {
     match code as u32 {
         0x00000000 => "kIOReturnSuccess",
@@ -227,6 +232,31 @@ fn get_parsers() -> &'static Mutex<HashMap<String, GaiaParser>> {
     PARSERS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+pub(crate) fn handle_backend_data(address: &str, data: &[u8]) {
+    if address.is_empty() || data.is_empty() {
+        return;
+    }
+    let mut parsers = match get_parsers().lock() {
+        Ok(guard) => guard,
+        Err(_) => return,
+    };
+    let parser = parsers
+        .entry(address.to_string())
+        .or_insert_with(GaiaParser::new);
+    let packets = parser.push_bytes(data, address);
+    if let Some(app) = APP_HANDLE.get() {
+        for packet in packets {
+            let _ = app.emit("gaia_packet", packet);
+        }
+    }
+}
+
+pub(crate) fn emit_backend_device_event(address: String, connected: bool) {
+    if let Some(app) = APP_HANDLE.get() {
+        let _ = app.emit("bt_device_event", DeviceStateEvent { address, connected });
+    }
+}
+
 #[cfg(target_os = "macos")]
 extern "C" {
     fn macos_bt_list_paired_devices() -> *mut std::os::raw::c_char;
@@ -238,6 +268,7 @@ extern "C" {
     fn macos_bt_get_connection_infos() -> *mut std::os::raw::c_char;
 }
 
+#[cfg(target_os = "macos")]
 #[no_mangle]
 pub extern "C" fn macos_bt_on_data(
     address: *const std::os::raw::c_char,
@@ -251,21 +282,10 @@ pub extern "C" fn macos_bt_on_data(
         .to_string_lossy()
         .to_string();
     let bytes = unsafe { std::slice::from_raw_parts(data, len) };
-    let mut parsers = match get_parsers().lock() {
-        Ok(guard) => guard,
-        Err(_) => return,
-    };
-    let parser = parsers
-        .entry(address.clone())
-        .or_insert_with(GaiaParser::new);
-    let packets = parser.push_bytes(bytes, &address);
-    if let Some(app) = APP_HANDLE.get() {
-        for packet in packets {
-            let _ = app.emit("gaia_packet", packet);
-        }
-    }
+    handle_backend_data(&address, bytes);
 }
 
+#[cfg(target_os = "macos")]
 #[no_mangle]
 pub extern "C" fn macos_bt_on_device_event(address: *const std::os::raw::c_char, connected: i32) {
     if address.is_null() {
@@ -274,19 +294,11 @@ pub extern "C" fn macos_bt_on_device_event(address: *const std::os::raw::c_char,
     let addr = unsafe { CStr::from_ptr(address) }
         .to_string_lossy()
         .to_string();
-    if let Some(app) = APP_HANDLE.get() {
-        let _ = app.emit(
-            "bt_device_event",
-            DeviceStateEvent {
-                address: addr,
-                connected: connected != 0,
-            },
-        );
-    }
+    emit_backend_device_event(addr, connected != 0);
 }
 
 #[tauri::command]
-async fn list_devices() -> Result<Vec<BluetoothDeviceInfo>, String> {
+async fn list_devices(_app: AppHandle) -> Result<Vec<BluetoothDeviceInfo>, String> {
     #[cfg(target_os = "macos")]
     {
         back_log("RUST", "List devices".to_string());
@@ -302,14 +314,19 @@ async fn list_devices() -> Result<Vec<BluetoothDeviceInfo>, String> {
         Ok(list)
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "android")]
+    {
+        android_backend::list_devices(&_app).await
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "android")))]
     {
         Err("Not supported on this platform".to_string())
     }
 }
 
 #[tauri::command]
-async fn scan_unpaired_stone_devices() -> Result<Vec<BluetoothDeviceInfo>, String> {
+async fn scan_unpaired_stone_devices(_app: AppHandle) -> Result<Vec<BluetoothDeviceInfo>, String> {
     #[cfg(target_os = "macos")]
     {
         if CONNECT_IN_FLIGHT.load(Ordering::SeqCst) {
@@ -333,14 +350,23 @@ async fn scan_unpaired_stone_devices() -> Result<Vec<BluetoothDeviceInfo>, Strin
         Ok(list)
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "android")]
+    {
+        if CONNECT_IN_FLIGHT.load(Ordering::SeqCst) {
+            back_log("RUST", "Skip scan while connect is in progress".to_string());
+            return Ok(Vec::new());
+        }
+        android_backend::scan_unpaired_stone_devices(&_app).await
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "android")))]
     {
         Err("Not supported on this platform".to_string())
     }
 }
 
 #[tauri::command]
-async fn get_connection_infos() -> Result<Vec<ConnectionInfo>, String> {
+async fn get_connection_infos(_app: AppHandle) -> Result<Vec<ConnectionInfo>, String> {
     #[cfg(target_os = "macos")]
     {
         let ptr = unsafe { macos_bt_get_connection_infos() };
@@ -354,15 +380,20 @@ async fn get_connection_infos() -> Result<Vec<ConnectionInfo>, String> {
         Ok(infos)
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "android")]
+    {
+        android_backend::get_connection_infos(&_app).await
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "android")))]
     {
         Err("Not supported on this platform".to_string())
     }
 }
 
 #[tauri::command]
-async fn connect_device_async(address: String) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
+async fn connect_device_async(_app: AppHandle, address: String) -> Result<(), String> {
+    #[cfg(any(target_os = "macos", target_os = "android"))]
     {
         if CONNECT_IN_FLIGHT.swap(true, Ordering::SeqCst) {
             return Err("Connect already in progress (frontend queue should retry)".to_string());
@@ -371,8 +402,13 @@ async fn connect_device_async(address: String) -> Result<(), String> {
             .get()
             .cloned()
             .ok_or_else(|| "App not ready".to_string())?;
+        #[cfg(target_os = "android")]
+        let runtime_app = _app.clone();
         tauri::async_runtime::spawn(async move {
+            #[cfg(target_os = "macos")]
             let result = connect_device_inner(address.clone()).await;
+            #[cfg(target_os = "android")]
+            let result = connect_device_inner(runtime_app, address.clone()).await;
             CONNECT_IN_FLIGHT.store(false, Ordering::SeqCst);
             let payload = match result {
                 Ok(()) => ConnectResult {
@@ -391,7 +427,7 @@ async fn connect_device_async(address: String) -> Result<(), String> {
         Ok(())
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", target_os = "android")))]
     {
         let _ = address;
         Err("Not supported on this platform".to_string())
@@ -433,8 +469,14 @@ async fn connect_device_inner(address: String) -> Result<(), String> {
     }
 }
 
+#[cfg(target_os = "android")]
+async fn connect_device_inner(app: AppHandle, address: String) -> Result<(), String> {
+    back_log("RUST", format!("Connect request: {}", address));
+    android_backend::connect_device(&app, &address).await
+}
+
 #[tauri::command]
-async fn disconnect_device(address: String) -> Result<(), String> {
+async fn disconnect_device(_app: AppHandle, address: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         back_log("RUST", format!("Disconnect request: {}", address));
@@ -470,7 +512,13 @@ async fn disconnect_device(address: String) -> Result<(), String> {
         }
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "android")]
+    {
+        back_log("RUST", format!("Disconnect request: {}", address));
+        android_backend::disconnect_device(&_app, &address).await
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "android")))]
     {
         let _ = address;
         Err("Not supported on this platform".to_string())
@@ -479,6 +527,7 @@ async fn disconnect_device(address: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn send_gaia_command(
+    _app: AppHandle,
     address: String,
     vendor_id: u16,
     command_id: u16,
@@ -526,7 +575,23 @@ async fn send_gaia_command(
         }
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "android")]
+    {
+        back_log(
+            "RUST",
+            format!(
+                "Send GAIA command: addr={} vendor=0x{:04X} cmd=0x{:04X} len={}",
+                address,
+                vendor_id,
+                command_id,
+                payload.len()
+            ),
+        );
+        let frame = gaia_frame(vendor_id, command_id, &payload, 0)?;
+        android_backend::send_gaia_command(&_app, &address, &frame).await
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "android")))]
     {
         let _ = (address, vendor_id, command_id, payload);
         Err("Not supported on this platform".to_string())
@@ -655,7 +720,12 @@ fn setup_desktop_app(app: &mut tauri::App<Wry>) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(android_backend::init());
+
+    builder
         .setup(|app| {
             let _ = APP_HANDLE.set(app.handle().clone());
 
