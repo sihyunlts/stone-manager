@@ -51,6 +51,9 @@ class MainActivity : TauriActivity() {
   @SuppressLint("JavascriptInterface")
   override fun onWebViewCreate(webView: WebView) {
     appWebView = webView
+    webView.setOnTouchListener { _, event ->
+      event != null && event.pointerCount > 1
+    }
     webView.addJavascriptInterface(StoneAndroidInsetsBridge(), "StoneAndroidInsets")
 
     if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
