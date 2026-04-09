@@ -13,7 +13,7 @@
   &::before {
     content: "";
     display: block;
-    height: 32px;
+    height: var(--app-top-safe-area-inset);
   }
 
   .header-content {

@@ -61,6 +61,7 @@ $material-symbols-font-path: "../node_modules/material-symbols/";
   font-family: "Geist Sans", "Pretendard +100", "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
 
   --app-header-height: 64px;
+  --app-top-safe-area-inset: 32px;
 }
 
 * {
@@ -140,8 +141,8 @@ textarea {
 
 /* Let page content scroll under the header so header translucency/blur is visible. */
 .page > .app-header + .layout-shell {
-  margin-top: calc(-1 * (32px + var(--app-header-height)));
-  padding-top: calc(64px + var(--app-header-height));
+  margin-top: calc(-1 * (var(--app-top-safe-area-inset) + var(--app-header-height)));
+  padding-top: calc(32px + var(--app-top-safe-area-inset) + var(--app-header-height));
 }
 
 .flow-layout {
