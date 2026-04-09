@@ -66,6 +66,7 @@ $material-symbols-font-path: "../node_modules/material-symbols/";
 * {
   box-sizing: border-box;
   scrollbar-width: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 h1, h2, h3, h4, h5, h6, p {
@@ -82,6 +83,13 @@ body {
   color: var(--ink);
   user-select: none;
   -webkit-user-select: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
 .app-shell {
