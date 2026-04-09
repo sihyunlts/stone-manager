@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { bindSelect } from "../components/select";
-import { getActiveDeviceAddress } from "../state/registry";
+import { getSelectedSingleDeviceAddress } from "../state/registry";
 import { updateDeviceData } from "../state/telemetry";
-import { getActiveDeviceData, isActiveDeviceConnected } from "../state/active";
+import { getSelectionAnchorDeviceData, isSelectedDeviceConnected } from "../state/active";
 import { logLine } from "../utils/formatter";
 
 let batteryEl: HTMLElement | null = null;
@@ -124,7 +124,7 @@ export function resetBatteryState() {
 }
 
 export async function requestBattery() {
-  const address = getActiveDeviceAddress();
+  const address = getSelectedSingleDeviceAddress();
   if (!address) return;
   try {
     await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0455, payload: [] });
@@ -137,13 +137,13 @@ export async function requestBattery() {
 
 export function updateBatteryLabel() {
   if (!batteryEl || !batteryIconEl) return;
-  if (!isActiveDeviceConnected()) {
+  if (!isSelectedDeviceConnected()) {
     batteryEl.textContent = "--";
     batteryIconEl.textContent = "battery_android_question";
     void invoke("set_tray_battery", { percent: null, charging: false, full: false });
     return;
   }
-  const { batteryStep, batteryLevel, dcState } = getActiveDeviceData();
+  const { batteryStep, batteryLevel, dcState } = getSelectionAnchorDeviceData();
   const percent = useBatteryLevelDisplay
     ? (
       batteryLevel !== null
@@ -199,13 +199,13 @@ export function handleBatteryStepPacket(connectedAddress: string, dataPayload: n
       patch.batteryLevel = clampPercent(dataPayload[1]);
     }
     updateDeviceData(connectedAddress, patch);
-    if (connectedAddress === getActiveDeviceAddress()) updateBatteryLabel();
+    if (connectedAddress === getSelectedSingleDeviceAddress()) updateBatteryLabel();
   }
 }
 
 export function handleDcStatePacket(connectedAddress: string, dataPayload: number[]) {
   if (dataPayload.length >= 1 && connectedAddress) {
     updateDeviceData(connectedAddress, { dcState: dataPayload[0] });
-    if (connectedAddress === getActiveDeviceAddress()) updateBatteryLabel();
+    if (connectedAddress === getSelectedSingleDeviceAddress()) updateBatteryLabel();
   }
 }

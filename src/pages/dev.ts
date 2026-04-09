@@ -2,12 +2,15 @@ import { renderHeader } from "../components/header";
 import { renderSection } from "../components/section";
 import { renderList, renderListItem } from "../components/list";
 import { renderButton } from "../components/button";
+import { renderToggle } from "../components/toggle";
 
 type DevPageHandlers = {
   onSend: (vendorIdHex: string, commandIdHex: string, payloadHex: string) => void | Promise<void>;
   onPairingDebugMockSuccess: () => void;
   onPairingDebugMockFail: () => void;
   onOpenOnboarding: () => void;
+  getMultiControlMenuEnabled: () => boolean;
+  onToggleMultiControlMenu: (enabled: boolean) => void;
 };
 
 function getInputValue(selector: string) {
@@ -38,6 +41,16 @@ export function renderDevPage() {
       renderListItem({
         label: "페어링 실패 플로우 진입",
         id: "pairDebugMockFail",
+      }),
+    ]),
+  });
+
+  const experimentalSection = renderSection({
+    title: "실험 기능",
+    body: renderList([
+      renderListItem({
+        label: "동시 제어 메뉴 표시",
+        right: renderToggle({ id: "devMultiControlMenuToggle" }),
       }),
     ]),
   });
@@ -74,6 +87,7 @@ export function renderDevPage() {
       <div class="layout-shell">
         <main class="layout">
           ${stoneInfoSection}
+          ${experimentalSection}
           ${uiDebugSection}
           ${gaiaSection}
         </main>
@@ -112,6 +126,14 @@ export function bindDevPage(handlers: DevPageHandlers) {
   if (devOpenOnboarding) {
     devOpenOnboarding.addEventListener("click", () => {
       handlers.onOpenOnboarding();
+    });
+  }
+
+  const multiControlMenuToggle = document.querySelector<HTMLInputElement>("#devMultiControlMenuToggle");
+  if (multiControlMenuToggle) {
+    multiControlMenuToggle.checked = handlers.getMultiControlMenuEnabled();
+    multiControlMenuToggle.addEventListener("change", () => {
+      handlers.onToggleMultiControlMenu(!!multiControlMenuToggle.checked);
     });
   }
 }

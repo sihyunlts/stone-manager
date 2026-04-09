@@ -1,7 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
-import { getActiveDeviceAddress } from "../state/registry";
+import { getSelectedSingleDeviceAddress } from "../state/registry";
 import { getDeviceData, updateDeviceData } from "../state/telemetry";
-import { getActiveDeviceData, updateActiveDeviceData, isActiveDeviceConnected } from "../state/active";
+import { getSelectionAnchorDeviceData, updateSelectionAnchorDeviceData } from "../state/active";
+import { getControlTargetAddresses } from "../state/multi-control";
 import { updateRangeFill } from "../components/range";
 import { bindSelect } from "../components/select";
 import { logLine } from "../utils/formatter";
@@ -14,10 +15,17 @@ let lampHueContainerEl: HTMLElement | null = null;
 let lampTypeSelect: ReturnType<typeof bindSelect> | null = null;
 const LAMP_BRIGHTNESS_SEND_BUCKET_COUNT = 30;
 const LAMP_HUE_SEND_BUCKET_COUNT = 24;
-let lastLampBrightnessAddress: string | null = null;
-let lastLampBrightnessBucket: number | null = null;
-let lastLampColorAddress: string | null = null;
-let lastLampColorBucket: number | null = null;
+const lastLampBrightnessBucketByAddress = new Map<string, number>();
+const lastLampColorBucketByAddress = new Map<string, number>();
+
+async function runBroadcast(tasks: Promise<unknown>[]) {
+  const results = await Promise.allSettled(tasks);
+  results.forEach((result) => {
+    if (result.status === "rejected") {
+      logLine(String(result.reason), "SYS");
+    }
+  });
+}
 
 function toLampBrightnessBucket(value: number) {
   const clamped = Math.max(0, Math.min(100, value));
@@ -48,7 +56,7 @@ export function initLamp() {
 
   lampTypeSelect = bindSelect("lampType", (value) => {
     const next = Number(value);
-    const data = updateActiveDeviceData({ lampType: next });
+    const data = updateSelectionAnchorDeviceData({ lampType: next });
     if (!data || !data.lampOn) return;
     void (async () => {
       try {
@@ -65,18 +73,18 @@ export function initLamp() {
 
   lampToggleEl?.addEventListener("change", () => {
     if (!lampToggleEl) return;
-    const currentData = getActiveDeviceData();
+    const currentData = getSelectionAnchorDeviceData();
     const current = currentData.lampBrightness ?? 0;
     const nextValue = lampToggleEl.checked
       ? current > 0 ? current : currentData.lampLastNonZero
       : 0;
-    const updated = updateActiveDeviceData({
+    const updated = updateSelectionAnchorDeviceData({
       lampBrightness: nextValue,
       lampOn: lampToggleEl.checked,
       lampLastNonZero: nextValue > 0 ? nextValue : currentData.lampLastNonZero,
     });
     updateLampUI();
-    if (!updated || !isActiveDeviceConnected()) return;
+    if (!updated || getControlTargetAddresses().length === 0) return;
     if (updated.lampOn) {
       runLamp(nextValue, updated.lampType, updated.lampHue).catch((err) => logLine(String(err), "SYS"));
     } else {
@@ -87,12 +95,12 @@ export function initLamp() {
   lampBrightnessEl?.addEventListener("input", () => {
     if (!lampBrightnessEl) return;
     const value = Number(lampBrightnessEl.value);
-    const updated = updateActiveDeviceData({
+    const updated = updateSelectionAnchorDeviceData({
       lampBrightness: value,
-      lampLastNonZero: value > 0 ? value : getActiveDeviceData().lampLastNonZero,
+      lampLastNonZero: value > 0 ? value : getSelectionAnchorDeviceData().lampLastNonZero,
     });
     updateLampUI();
-    if (updated && updated.lampOn && isActiveDeviceConnected()) {
+    if (updated && updated.lampOn && getControlTargetAddresses().length > 0) {
       setLampBrightness(value).catch((err) => logLine(String(err), "SYS"));
     }
   });
@@ -100,9 +108,9 @@ export function initLamp() {
   lampHueEl?.addEventListener("input", () => {
     if (!lampHueEl) return;
     const nextHue = Number(lampHueEl.value);
-    const updated = updateActiveDeviceData({ lampHue: nextHue });
+    const updated = updateSelectionAnchorDeviceData({ lampHue: nextHue });
     updateRangeFill(lampHueEl);
-    if (!updated || !updated.lampOn || !isActiveDeviceConnected()) return;
+    if (!updated || !updated.lampOn || getControlTargetAddresses().length === 0) return;
     if (updated.lampType === 1) {
       setLampColor(updated.lampHue).catch((err) => logLine(String(err), "SYS"));
     }
@@ -111,7 +119,7 @@ export function initLamp() {
 
 export function updateLampUI() {
   if (!lampBrightnessEl || !lampToggleEl || !lampHueEl) return;
-  const data = getActiveDeviceData();
+  const data = getSelectionAnchorDeviceData();
   lampBrightnessEl.value = data.lampBrightness === null ? "0" : String(data.lampBrightness);
   updateRangeFill(lampBrightnessEl);
   lampToggleEl.checked = data.lampOn;
@@ -131,10 +139,7 @@ export function updateLampUI() {
 }
 
 export function resetLampState() {
-  const address = getActiveDeviceAddress();
-  if (address) {
-    updateDeviceData(address, { lampOn: false });
-  }
+  updateSelectionAnchorDeviceData({ lampOn: false });
   updateLampUI();
 }
 
@@ -170,7 +175,7 @@ export function rgbToSlider(r: number, g: number, b: number) {
 }
 
 export async function requestLampState() {
-  const address = getActiveDeviceAddress();
+  const address = getSelectedSingleDeviceAddress();
   if (!address) return;
   try {
     await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0411, payload: [] });
@@ -181,58 +186,71 @@ export async function requestLampState() {
 }
 
 async function setLampBrightness(value: number) {
-  const address = getActiveDeviceAddress();
-  if (!address) return;
+  const addresses = getControlTargetAddresses();
+  if (addresses.length === 0) return;
   const bucket = toLampBrightnessBucket(value);
-  const normalizedAddress = address.toLowerCase();
-  if (lastLampBrightnessAddress === normalizedAddress && lastLampBrightnessBucket === bucket) {
-    return;
-  }
   const quantized = fromLampBrightnessBucket(bucket);
   const rounded = Math.round(quantized);
-  await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0202, payload: [rounded] });
-  lastLampBrightnessAddress = normalizedAddress;
-  lastLampBrightnessBucket = bucket;
+  const tasks = addresses.map(async (address) => {
+    const normalizedAddress = address.toLowerCase();
+    if (lastLampBrightnessBucketByAddress.get(normalizedAddress) === bucket) {
+      return;
+    }
+    await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0202, payload: [rounded] });
+    lastLampBrightnessBucketByAddress.set(normalizedAddress, bucket);
+  });
+  await runBroadcast(tasks);
 }
 
 async function setLampType(value: number) {
-  const address = getActiveDeviceAddress();
-  if (!address) return;
-  await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0203, payload: [value] });
+  const addresses = getControlTargetAddresses();
+  if (addresses.length === 0) return;
+  const tasks = addresses.map((address) =>
+    invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0203, payload: [value] })
+  );
+  await runBroadcast(tasks);
 }
 
 async function setLampColor(hue: number, options?: { force?: boolean }) {
-  const address = getActiveDeviceAddress();
-  if (!address) return;
+  const addresses = getControlTargetAddresses();
+  if (addresses.length === 0) return;
   const bucket = toHueBucket(hue);
-  const normalizedAddress = address.toLowerCase();
-  if (!options?.force && lastLampColorAddress === normalizedAddress && lastLampColorBucket === bucket) {
-    return;
-  }
   const quantizedHue = fromHueBucket(bucket);
   const [r, g, b] = sliderToRgb(quantizedHue);
-  await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0204, payload: [r, g, b] });
-  lastLampColorAddress = normalizedAddress;
-  lastLampColorBucket = bucket;
+  const tasks = addresses.map(async (address) => {
+    const normalizedAddress = address.toLowerCase();
+    if (!options?.force && lastLampColorBucketByAddress.get(normalizedAddress) === bucket) {
+      return;
+    }
+    await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0204, payload: [r, g, b] });
+    lastLampColorBucketByAddress.set(normalizedAddress, bucket);
+  });
+  await runBroadcast(tasks);
 }
 
 async function runLamp(mood: number, type: number, hue: number) {
-  const address = getActiveDeviceAddress();
-  if (!address) return;
+  const addresses = getControlTargetAddresses();
+  if (addresses.length === 0) return;
   const [r, g, b] = sliderToRgb(hue);
   const rounded = Math.round(mood);
-  await invoke("send_gaia_command", {
-    address,
-    vendorId: 0x5054,
-    commandId: 0x0212,
-    payload: [rounded, type, r, g, b],
-  });
+  const tasks = addresses.map((address) =>
+    invoke("send_gaia_command", {
+      address,
+      vendorId: 0x5054,
+      commandId: 0x0212,
+      payload: [rounded, type, r, g, b],
+    })
+  );
+  await runBroadcast(tasks);
 }
 
 async function stopLamp() {
-  const address = getActiveDeviceAddress();
-  if (!address) return;
-  await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0213, payload: [] });
+  const addresses = getControlTargetAddresses();
+  if (addresses.length === 0) return;
+  const tasks = addresses.map((address) =>
+    invoke("send_gaia_command", { address, vendorId: 0x5054, commandId: 0x0213, payload: [] })
+  );
+  await runBroadcast(tasks);
 }
 
 export function handleLampStatePacket(connectedAddress: string, dataPayload: number[]) {
@@ -249,5 +267,5 @@ export function handleLampStatePacket(connectedAddress: string, dataPayload: num
       lampLastNonZero: lampBrightness > 0 ? lampBrightness : getDeviceData(connectedAddress).lampLastNonZero,
     });
   }
-  if (connectedAddress && connectedAddress === getActiveDeviceAddress()) updateLampUI();
+  if (connectedAddress && connectedAddress === getSelectedSingleDeviceAddress()) updateLampUI();
 }

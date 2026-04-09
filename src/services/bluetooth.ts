@@ -8,9 +8,10 @@ import {
   setDeviceLinkState,
 } from "../state/connection";
 import {
-  getActiveDeviceAddress,
   getRegisteredDevices,
-  setActiveDeviceAddress,
+  getSelectedSingleDeviceAddress,
+  isSelectedTargetMulti,
+  setSelectedSingleDeviceAddress,
   upsertRegisteredDevice as upsertRegisteredDeviceFromStore,
 } from "../state/registry";
 
@@ -161,7 +162,7 @@ export function initConnectController(deps: ConnectControllerDeps) {
         deps.logLine("Already connected", "SYS");
       }
       if (item.activateOnSuccess) {
-        setActiveDeviceAddress(address);
+        setSelectedSingleDeviceAddress(address);
       }
       return;
     }
@@ -201,9 +202,9 @@ export function initConnectController(deps: ConnectControllerDeps) {
       }
 
       if (current?.activateOnSuccess) {
-        setActiveDeviceAddress(result.address);
-      } else if (!getActiveDeviceAddress()) {
-        setActiveDeviceAddress(result.address);
+        setSelectedSingleDeviceAddress(result.address);
+      } else if (!getSelectedSingleDeviceAddress() && !isSelectedTargetMulti()) {
+        setSelectedSingleDeviceAddress(result.address);
       }
 
       if (!current?.quiet) {
@@ -237,10 +238,10 @@ export function initConnectController(deps: ConnectControllerDeps) {
         if (!info.rfcomm) continue;
         registerDevice(info.address);
       }
-      if (!getActiveDeviceAddress()) {
+      if (!getSelectedSingleDeviceAddress() && !isSelectedTargetMulti()) {
         const firstConnected = (infos ?? []).find((info) => info.rfcomm);
         if (firstConnected) {
-          setActiveDeviceAddress(firstConnected.address);
+          setSelectedSingleDeviceAddress(firstConnected.address);
         }
       }
     } catch (err) {
@@ -264,10 +265,11 @@ export function initConnectController(deps: ConnectControllerDeps) {
     const registered = getRegisteredDevices();
     if (registered.length === 0) return;
 
-    const active = getActiveDeviceAddress();
+    const active = getSelectedSingleDeviceAddress() ?? registered[0]?.address;
+    if (!active) return;
     const ordered = [
-      ...(active ? [active] : []),
-      ...registered.map((d) => d.address).filter((address) => !active || !isSameAddress(address, active)),
+      active,
+      ...registered.map((d) => d.address).filter((address) => !isSameAddress(address, active)),
     ];
 
     const seen = new Set<string>();

@@ -311,6 +311,10 @@ body {
   padding-bottom: calc(var(--app-header-height) + 32px + env(safe-area-inset-bottom));
 }
 
+#page-home.home--multi-control .statusSection {
+  display: none;
+}
+
 #page-home .statusSection {
   will-change: transform;
 }

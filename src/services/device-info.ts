@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
-import { getActiveDeviceAddress } from "../state/registry";
+import { getSelectedSingleDeviceAddress } from "../state/registry";
 import { logLine, toHex } from "../utils/formatter";
 
 type DeviceInfoState = {
@@ -78,11 +78,11 @@ export function initDeviceInfo() {
 }
 
 export function updateDeviceInfoUI() {
-  renderDeviceInfo(getActiveDeviceAddress());
+  renderDeviceInfo(getSelectedSingleDeviceAddress());
 }
 
 async function requestDeviceInfo(commandId: number) {
-  const address = getActiveDeviceAddress();
+  const address = getSelectedSingleDeviceAddress();
   if (!address) return;
   try {
     await invoke("send_gaia_command", { address, vendorId: 0x5054, commandId, payload: [] });
@@ -136,7 +136,7 @@ export function handleDeviceInfoPacket(address: string, command: number, dataPay
     state.wheel = parseInt32BE(dataPayload);
   }
 
-  if (getActiveDeviceAddress()?.toLowerCase() === address.toLowerCase()) {
+  if (getSelectedSingleDeviceAddress()?.toLowerCase() === address.toLowerCase()) {
     renderDeviceInfo(address);
   }
 }

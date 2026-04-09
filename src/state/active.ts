@@ -1,4 +1,8 @@
-import { getActiveDeviceAddress, getRegisteredDevices } from "./registry";
+import {
+  getRegisteredDevices,
+  getSelectedSingleDeviceAddress,
+} from "./registry";
+import { getControlTargetAddresses } from "./multi-control";
 import {
   getDeviceData,
   getDefaultDeviceData,
@@ -7,27 +11,34 @@ import {
 } from "./telemetry";
 import { getDeviceConnection } from "./connection";
 
-export function getActiveDeviceData() {
-  const address = getActiveDeviceAddress();
+function getSelectionAnchorAddress() {
+  return getSelectedSingleDeviceAddress()
+    ?? getControlTargetAddresses()[0]
+    ?? getRegisteredDevices()[0]?.address
+    ?? null;
+}
+
+export function getSelectionAnchorDeviceData() {
+  const address = getSelectionAnchorAddress();
   if (!address) return getDefaultDeviceData();
   return getDeviceData(address);
 }
 
-export function updateActiveDeviceData(patch: Partial<DeviceData>) {
-  const address = getActiveDeviceAddress();
+export function updateSelectionAnchorDeviceData(patch: Partial<DeviceData>) {
+  const address = getSelectionAnchorAddress();
   if (!address) return null;
   return updateDeviceData(address, patch);
 }
 
-export function isActiveDeviceConnected() {
-  const active = getActiveDeviceAddress();
-  if (!active) return false;
-  const conn = getDeviceConnection(active);
+export function isSelectedDeviceConnected() {
+  const address = getSelectedSingleDeviceAddress();
+  if (!address) return false;
+  const conn = getDeviceConnection(address);
   return !!conn && conn.state === "connected" && conn.rfcomm;
 }
 
-export function getActiveDeviceLabel() {
-  const address = getActiveDeviceAddress();
+export function getSelectedDeviceLabel() {
+  const address = getSelectedSingleDeviceAddress();
   if (!address) return null;
   const registered = getRegisteredDevices().find(
     (device) => device.address === address

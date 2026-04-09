@@ -21,16 +21,26 @@ import {
   subscribeConnection,
 } from "./state/connection";
 import {
-  getActiveDeviceAddress,
+  getSelectedSingleDeviceAddress,
   getRegisteredDevices,
   removeRegisteredDevice,
-  setActiveDeviceAddress,
-  subscribeActiveDevice,
+  MULTI_CONTROL_SELECT_VALUE,
+  setSelectedSingleDeviceAddress,
+  setSelectedTargetMulti,
   subscribeRegisteredDevices,
+  subscribeSelectedTarget,
+  isSelectedTargetMulti,
 } from "./state/registry";
+import {
+  isMultiControlMenuEnabled,
+  setMultiControlMenuEnabled,
+} from "./state/multi-control";
 import { renderHomePage, initHomeConnectionUi } from "./pages/home";
 import { initToast } from "./components/toast";
-import { isActiveDeviceConnected, getActiveDeviceLabel } from "./state/active";
+import {
+  getSelectedDeviceLabel,
+  isSelectedDeviceConnected,
+} from "./state/active";
 import { toHex, parseHexBytes, logLine } from "./utils/formatter";
 import { el } from "./utils/dom";
 import { initNavigation } from "./utils/navigation";
@@ -62,7 +72,6 @@ import {
 } from "./services/device-info";
 
 const ONBOARDING_SEEN_KEY = "stone.onboarding_seen_v1";
-
 export function initApp() {
   const shouldShowOnboarding = window.localStorage.getItem(ONBOARDING_SEEN_KEY) !== "1";
   const app = el<HTMLDivElement>("#app");
@@ -163,65 +172,85 @@ export function initApp() {
       syncHeaderInteractiveNoDrag();
       return;
     }
-    const active = getActiveDeviceAddress() ?? devices[0]?.address ?? null;
-    if (active && active !== getActiveDeviceAddress()) {
-      setActiveDeviceAddress(active);
+    const multiControlMenuEnabled = isMultiControlMenuEnabled();
+    const options: Array<{ value: string; label: string; icon?: string }> = devices.map((device) => ({
+      value: device.address,
+      label: device.name ?? device.address,
+    }));
+    if (multiControlMenuEnabled) {
+      options.push({
+        value: MULTI_CONTROL_SELECT_VALUE,
+        label: "동시 제어",
+        icon: "select_all",
+      });
     }
+    const selectedValue = multiControlMenuEnabled && isSelectedTargetMulti()
+      ? MULTI_CONTROL_SELECT_VALUE
+      : getSelectedSingleDeviceAddress() ?? devices[0]?.address;
     appTitle.innerHTML = renderSelect({
       id: "deviceSelect",
       className: "select--title",
-      options: devices.map((device) => ({
-        value: device.address,
-        label: device.name ?? device.address,
-      })),
-      value: active ?? "",
+      options,
+      value: selectedValue,
     });
     bindSelect("deviceSelect", (value) => {
-      setActiveDeviceAddress(value);
+      if (value === MULTI_CONTROL_SELECT_VALUE) {
+        if (!isMultiControlMenuEnabled()) return;
+        setSelectedTargetMulti();
+        return;
+      }
+      setSelectedSingleDeviceAddress(value);
     });
     syncHeaderInteractiveNoDrag();
   }
 
   function syncActiveDeviceUI(options?: { animateHomeConnectionUi?: boolean }) {
     const animateHomeConnectionUi = options?.animateHomeConnectionUi ?? true;
+    const multiSelected = isSelectedTargetMulti();
+    const connected = isSelectedDeviceConnected();
+    const selectedAddress = getSelectedSingleDeviceAddress();
+    pageHome.classList.toggle("home--multi-control", multiSelected);
     updateConnectionStatus();
     updateStatusAction();
     updateDeviceInfoUI();
     updateBatteryLabel();
     updateVolumeUI();
     updateLampUI();
-    const connected = isActiveDeviceConnected();
-    const active = getActiveDeviceAddress();
-    if (connected && active) {
-      if (batteryPollingAddress !== active) {
+    if (!multiSelected && connected && selectedAddress) {
+      if (batteryPollingAddress !== selectedAddress) {
         startBatteryPolling();
-        batteryPollingAddress = active;
+        batteryPollingAddress = selectedAddress;
       }
-      if (primedAddress !== active) {
+      if (primedAddress !== selectedAddress) {
         requestBattery().catch((err) => logLine(String(err), "SYS"));
         requestVolume().catch((err) => logLine(String(err), "SYS"));
         requestLampState().catch((err) => logLine(String(err), "SYS"));
         requestStaticDeviceInfo();
-        primedAddress = active;
+        primedAddress = selectedAddress;
       }
     } else {
       stopBatteryPolling();
       batteryPollingAddress = null;
       resetBatteryState();
-      resetLampState();
-      if (!active || active === primedAddress) {
-        primedAddress = null;
+      primedAddress = null;
+      if (!multiSelected) {
+        resetLampState();
       }
     }
-    homeConnectionUi.sync(connected, { animate: animateHomeConnectionUi });
+    homeConnectionUi.sync(multiSelected || connected, { animate: animateHomeConnectionUi });
     if (settingsStoneInfo) {
-      settingsStoneInfo.style.display = connected ? "" : "none";
+      settingsStoneInfo.style.display = !multiSelected && connected ? "" : "none";
     }
   }
 
   function updateConnectionStatus() {
-    const active = getActiveDeviceAddress();
-    const activeConnection = active ? getDeviceConnection(active) : null;
+    if (isSelectedTargetMulti()) {
+      status.textContent = "동시 제어";
+      status.classList.add("connected");
+      return;
+    }
+    const selectedAddress = getSelectedSingleDeviceAddress();
+    const activeConnection = selectedAddress ? getDeviceConnection(selectedAddress) : null;
     const state = activeConnection?.state ?? "idle";
     switch (state) {
       case "connecting":
@@ -233,8 +262,8 @@ export function initApp() {
         status.classList.remove("connected");
         break;
       case "connected": {
-        const label = active
-          ? connectController?.getDeviceLabel(active) ?? active
+        const label = selectedAddress
+          ? connectController?.getDeviceLabel(selectedAddress) ?? selectedAddress
           : "Unknown";
         status.textContent = label;
         status.classList.add("connected");
@@ -242,21 +271,26 @@ export function initApp() {
       }
       case "idle":
       default:
-        status.textContent = `${getActiveDeviceLabel() ?? "STONE"}이 연결되지 않음`;
+        status.textContent = `${getSelectedDeviceLabel() ?? "STONE"}이 연결되지 않음`;
         status.classList.remove("connected");
         break;
     }
   }
 
   function updateStatusAction() {
-    const active = getActiveDeviceAddress();
-    if (!active) {
+    if (isSelectedTargetMulti()) {
+      statusAction.style.display = "none";
+      statusUnpair.style.display = "none";
+      return;
+    }
+    const selectedAddress = getSelectedSingleDeviceAddress();
+    if (!selectedAddress) {
       statusAction.style.display = "none";
       statusUnpair.style.display = "none";
       return;
     }
     statusAction.style.display = "";
-    if (isActiveDeviceConnected()) {
+    if (isSelectedDeviceConnected()) {
       statusAction.textContent = "연결 끊기";
       statusAction.dataset.action = "disconnect";
       statusUnpair.style.display = "none";
@@ -346,7 +380,7 @@ export function initApp() {
         logLine("Invalid vendor or command id", "SYS");
         return;
       }
-      const address = getActiveDeviceAddress();
+      const address = getSelectedSingleDeviceAddress();
       if (!address) {
         logLine("No active device selected", "SYS");
         return;
@@ -375,6 +409,15 @@ export function initApp() {
     onOpenOnboarding: () => {
       goTo("onboarding");
     },
+    getMultiControlMenuEnabled: () => isMultiControlMenuEnabled(),
+    onToggleMultiControlMenu: (enabled) => {
+      const selectionWasMulti = isSelectedTargetMulti();
+      setMultiControlMenuEnabled(enabled);
+      renderDeviceTitle();
+      if (!(selectionWasMulti && !enabled)) {
+        syncActiveDeviceUI({ animateHomeConnectionUi: false });
+      }
+    },
   });
 
   bindOnboardingPage({
@@ -393,20 +436,22 @@ export function initApp() {
   // --- UI Event Listeners ---
 
   statusAction.addEventListener("click", () => {
-    const active = getActiveDeviceAddress();
-    if (!active || !connectController) return;
-    if (isActiveDeviceConnected()) {
-      void connectController.disconnectAddress(active);
+    if (isSelectedTargetMulti()) return;
+    const selectedAddress = getSelectedSingleDeviceAddress();
+    if (!selectedAddress || !connectController) return;
+    if (isSelectedDeviceConnected()) {
+      void connectController.disconnectAddress(selectedAddress);
     } else {
-      void connectController.connectAddress(active);
+      void connectController.connectAddress(selectedAddress);
     }
   });
 
   statusUnpair.addEventListener("click", () => {
-    const active = getActiveDeviceAddress();
-    if (!active || isActiveDeviceConnected()) return;
-    removeRegisteredDevice(active);
-    removeDeviceConnection(active);
+    if (isSelectedTargetMulti()) return;
+    const selectedAddress = getSelectedSingleDeviceAddress();
+    if (!selectedAddress || isSelectedDeviceConnected()) return;
+    removeRegisteredDevice(selectedAddress);
+    removeDeviceConnection(selectedAddress);
     updateConnectionStatus();
   });
 
@@ -444,9 +489,9 @@ export function initApp() {
     syncActiveDeviceUI();
     addDevicePage?.render();
   });
-  subscribeActiveDevice(() => { 
+  subscribeSelectedTarget(() => {
     const layout = pageHome?.querySelector<HTMLElement>(".layout");
-    
+
     if (layout) {
       const exitSpring = {
         duration: 0.2,
@@ -468,21 +513,21 @@ export function initApp() {
         } as any, 
         exitSpring as any
       ).finished.then(() => {
-        renderDeviceTitle(); 
-        syncActiveDeviceUI({ animateHomeConnectionUi: false }); 
+        renderDeviceTitle();
+        syncActiveDeviceUI({ animateHomeConnectionUi: false });
 
-        animate(layout, 
-          { 
-            opacity: [0, 1], 
+        animate(layout,
+          {
+            opacity: [0, 1],
             y: [15, 0],
             scale: [1, 1],
-          } as any, 
+          } as any,
           enterSpring as any
         );
       });
     } else {
-      renderDeviceTitle(); 
-      syncActiveDeviceUI({ animateHomeConnectionUi: false }); 
+      renderDeviceTitle();
+      syncActiveDeviceUI({ animateHomeConnectionUi: false });
     }
   });
   subscribeConnection(() => { syncActiveDeviceUI(); });
