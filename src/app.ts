@@ -72,6 +72,11 @@ import {
 } from "./services/device-info";
 
 const ONBOARDING_SEEN_KEY = "stone.onboarding_seen_v1";
+
+function shouldBootstrapBluetoothOnLaunch() {
+  return !/Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent);
+}
+
 export function initApp() {
   const shouldShowOnboarding = window.localStorage.getItem(ONBOARDING_SEEN_KEY) !== "1";
   const app = el<HTMLDivElement>("#app");
@@ -423,7 +428,9 @@ export function initApp() {
   bindOnboardingPage({
     onNext: () => {
       window.localStorage.setItem(ONBOARDING_SEEN_KEY, "1");
-      bootstrapBluetoothIfNeeded();
+      if (shouldBootstrapBluetoothOnLaunch()) {
+        bootstrapBluetoothIfNeeded();
+      }
       replaceTo("pairing");
     },
   });
@@ -545,7 +552,7 @@ export function initApp() {
   });
   listen<GaiaPacketEvent>("gaia_packet", (event) => handleGaiaPacket(event.payload));
 
-  if (!shouldShowOnboarding) {
+  if (!shouldShowOnboarding && shouldBootstrapBluetoothOnLaunch()) {
     bootstrapBluetoothIfNeeded();
   }
 }
