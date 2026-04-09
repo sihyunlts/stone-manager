@@ -25,12 +25,8 @@ type SelectCleanup = {
 
 const bindingCleanupById = new Map<string, SelectCleanup>();
 
-export function renderSelect(options: SelectOptions) {
-  const { id, options: items, value, className, direction = "down" } = options;
-  const classes = ["select", className].filter(Boolean).join(" ");
-  const currentValue = value !== undefined ? String(value) : String(items[0]?.value ?? "");
-  const currentLabel = items.find((item) => String(item.value) === currentValue)?.label ?? "";
-  const optionsMarkup = items
+function renderOptionsMarkup(items: SelectOption[], currentValue: string) {
+  return items
     .map((item) => {
       const selected = String(item.value) === currentValue ? " is-selected" : "";
       return `
@@ -41,6 +37,14 @@ export function renderSelect(options: SelectOptions) {
       `;
     })
     .join("");
+}
+
+export function renderSelect(options: SelectOptions) {
+  const { id, options: items, value, className, direction = "down" } = options;
+  const classes = ["select", className].filter(Boolean).join(" ");
+  const currentValue = value !== undefined ? String(value) : String(items[0]?.value ?? "");
+  const currentLabel = items.find((item) => String(item.value) === currentValue)?.label ?? "";
+  const optionsMarkup = renderOptionsMarkup(items, currentValue);
   return `
     <div id="${id}" class="${classes}" data-value="${currentValue}" data-direction="${direction}">
       <button class="select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
@@ -63,7 +67,15 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
   const trigger = root.querySelector<HTMLButtonElement>(".select-trigger");
   const menu = root.querySelector<HTMLDivElement>(".select-menu");
   let options = Array.from(root.querySelectorAll<HTMLDivElement>(".select-option"));
+  let isClosing = false;
+  let transitionToken = 0;
+  let activeAnimation: ReturnType<typeof animate> | null = null;
   if (!trigger || !menu) return null;
+
+  function stopActiveAnimation() {
+    activeAnimation?.stop();
+    activeAnimation = null;
+  }
 
   function setValue(value: string | number, emit = false) {
     const nextValue = String(value);
@@ -78,7 +90,11 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
     if (emit) onChange(nextValue);
   }
 
-  function openMenu() {
+  function openMenu(options?: { fromCurrentState?: boolean }) {
+    stopActiveAnimation();
+    isClosing = false;
+    transitionToken += 1;
+
     const direction = root!.dataset.direction ?? "down";
     root!.classList.toggle("is-up", direction === "up");
     root!.classList.toggle("is-down", direction === "down");
@@ -105,29 +121,55 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
     });
 
     const yOffset = direction === "up" ? 8 : -8;
-    animate(menu!, 
-      { 
-        opacity: [0, 1], 
-        scale: [0.95, 1], 
-        y: [yOffset, 0] 
-      } as any, 
-      { 
-        type: "spring",
-        stiffness: 500,
-        damping: 30,
-        mass: 1
-      } as any
-    );
+    const animation = options?.fromCurrentState
+      ? animate(
+          menu!,
+          {
+            opacity: 1,
+            scale: 1,
+            y: 0,
+          } as any,
+          {
+            type: "spring",
+            stiffness: 500,
+            damping: 30,
+            mass: 1,
+          } as any
+        )
+      : animate(
+          menu!,
+          {
+            opacity: [0, 1],
+            scale: [0.95, 1],
+            y: [yOffset, 0],
+          } as any,
+          {
+            type: "spring",
+            stiffness: 500,
+            damping: 30,
+            mass: 1,
+          } as any
+        );
+    activeAnimation = animation;
+    void animation.finished.then(() => {
+      if (activeAnimation !== animation) return;
+      activeAnimation = null;
+    });
   }
 
   async function closeMenu() {
-    if (!root!.classList.contains("is-open")) return;
+    if (!root!.classList.contains("is-open") || isClosing) return;
+    isClosing = true;
+    const token = ++transitionToken;
     const direction = root!.dataset.direction ?? "down";
     const yOffset = direction === "up" ? 8 : -8;
+
+    stopActiveAnimation();
     
     const animation = animate(menu!, 
       { 
         opacity: [1, 0], 
+        scale: [1, 1],
         y: [0, yOffset] 
       } as any, 
       { 
@@ -137,8 +179,13 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
         mass: 1
       } as any
     );
+    activeAnimation = animation;
 
     await animation.finished;
+    if (token !== transitionToken) return;
+
+    activeAnimation = null;
+    isClosing = false;
     root!.classList.remove("is-open");
     trigger!.setAttribute("aria-expanded", "false");
     menu!.style.left = "";
@@ -160,24 +207,18 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
 
   function setOptions(items: SelectOption[], value?: string | number, emit = false) {
     const currentValue = value !== undefined ? String(value) : String(items[0]?.value ?? "");
-    const optionsMarkup = items
-      .map((item) => {
-        const selected = String(item.value) === currentValue ? " is-selected" : "";
-        return `
-          <div class="select-option${selected}" data-value="${item.value}">
-            ${item.icon ? `<span class="material-symbols-rounded select-option-icon">${item.icon}</span>` : ""}
-            <span class="select-option-label">${item.label}</span>
-          </div>
-        `;
-      })
-      .join("");
-    menu!.innerHTML = optionsMarkup;
+    menu!.innerHTML = renderOptionsMarkup(items, currentValue);
     bindOptions();
     setValue(currentValue, emit);
   }
 
   const handleTriggerClick = (event: MouseEvent) => {
     event.stopPropagation();
+    if (isClosing) {
+      openMenu({ fromCurrentState: true });
+      return;
+    }
+
     const isOpen = root.classList.contains("is-open");
     
     if (isOpen) {
@@ -204,6 +245,7 @@ export function bindSelect(id: string, onChange: (value: string) => void): Selec
 
   bindingCleanupById.set(id, {
     destroy: () => {
+      stopActiveAnimation();
       trigger.removeEventListener("click", handleTriggerClick);
       document.removeEventListener("click", handleDocumentClick);
     },
