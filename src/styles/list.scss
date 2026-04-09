@@ -70,8 +70,10 @@
   cursor: pointer;
   padding-right: 44px;
 
-  &:hover {
-    background-color: rgba(255, 255, 255, 0.05);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
   }
 
   &:active {

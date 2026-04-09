@@ -47,8 +47,10 @@
   background: transparent;
   color: var(--muted);
 
-  &:hover {
-    background: rgba(255, 255, 255, 0.05);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
   }
 
   &:active {
