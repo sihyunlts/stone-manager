@@ -54,6 +54,11 @@ class MainActivity : TauriActivity() {
     webView.setOnTouchListener { _, event ->
       event != null && event.pointerCount > 1
     }
+    webView.isLongClickable = false
+    webView.isHapticFeedbackEnabled = false
+    webView.setOnLongClickListener {
+      true
+    }
     webView.addJavascriptInterface(StoneAndroidInsetsBridge(), "StoneAndroidInsets")
 
     if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
