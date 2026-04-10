@@ -8,6 +8,7 @@ use std::sync::Mutex;
 #[cfg(target_os = "android")]
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
+use tauri_plugin_opener::OpenerExt;
 
 #[cfg(target_os = "android")]
 mod android_backend;
@@ -710,16 +711,10 @@ fn log_line(line: String, tone: String, _ts: String) {
 }
 
 #[tauri::command]
-fn open_url(url: String) {
-    #[cfg(target_os = "macos")]
-    {
-        let _ = std::process::Command::new("open").arg(url).spawn();
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = url;
-    }
+fn open_url(app: AppHandle, url: String) -> Result<(), String> {
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|err| err.to_string())
 }
 
 #[tauri::command]
@@ -832,6 +827,7 @@ pub fn run() {
     let builder = builder.plugin(android_backend::init());
 
     builder
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let _ = APP_HANDLE.set(app.handle().clone());
 
