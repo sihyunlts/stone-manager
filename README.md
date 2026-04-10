@@ -11,7 +11,7 @@ STONE Manager (Tauri) is a cross-platform reimplementation of the original Andro
 | Feature | Status | Notes |
 | :--- | :---: | :--- |
 | **Device Pairing** | ✅ |  |
-| **Battery Level** | 🚧 | May be inaccurate |
+| **Battery Level** | ✅ |  |
 | **Device Info** | ✅ |  |
 | **Volume Control** | ✅ |  |
 | **Mood Lamp** | ✅ |  |
@@ -23,7 +23,7 @@ STONE Manager (Tauri) is a cross-platform reimplementation of the original Andro
 | **macOS** | ✅ | Fully supported (Only tested on macOS 26) |
 | **Windows** | ❓ | Not tested |
 | **Linux** | ❓ | Not tested |
-| **Android** | ❓ | Not tested |
+| **Android** | 🚧 | Unstable |
 | **iOS** | ❓ | Not tested |
 
 ## To-do
