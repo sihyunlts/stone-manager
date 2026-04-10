@@ -132,7 +132,14 @@ export function initApp() {
 
   // --- Navigation ---
 
-  const { goTo, replaceTo, goBack, getCurrentPage } = initNavigation({
+  function handlePairingBackNavigation() {
+    if (getCurrentPage() !== "pairing" || !addDevicePage?.isConnecting()) {
+      return;
+    }
+    addDevicePage.handleBackWhileConnecting();
+  }
+
+  const { goTo, goToWithBackTarget, goBack, getCurrentPage } = initNavigation({
     pageHost,
     pages: {
       home: pageHome,
@@ -143,6 +150,11 @@ export function initApp() {
       onboarding: pageOnboarding,
     },
     initialPage: shouldShowOnboarding ? "onboarding" : "home",
+    onBeforePageChange: (from, to) => {
+      if (from === "pairing" && to !== "pairing") {
+        handlePairingBackNavigation();
+      }
+    },
     onPageChange: (to) => {
       if (to === "settings") {
         addDevicePage?.stopAutoScan();
@@ -431,7 +443,7 @@ export function initApp() {
       if (shouldBootstrapBluetoothOnLaunch()) {
         bootstrapBluetoothIfNeeded();
       }
-      replaceTo("pairing");
+      goToWithBackTarget("pairing", "home");
     },
   });
 
@@ -472,9 +484,7 @@ export function initApp() {
 
   navBackButtons.forEach((btn) =>
     btn.addEventListener("click", () => {
-      if (getCurrentPage() === "pairing" && addDevicePage?.isConnecting()) {
-        addDevicePage.handleBackWhileConnecting();
-      }
+      handlePairingBackNavigation();
       goBack();
     })
   );
