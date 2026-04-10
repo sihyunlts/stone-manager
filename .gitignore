@@ -37,6 +37,10 @@ Thumbs.db
 .env.test.local
 .env.production.local
 
+# Android signing secrets
+src-tauri/keystore.properties
+src-tauri/keys/
+
 # Agents
 .claude/
 .entire/

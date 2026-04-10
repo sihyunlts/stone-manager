@@ -1,3 +1,4 @@
+import java.io.File
 import java.util.Properties
 
 plugins {
@@ -13,10 +14,38 @@ val tauriProperties = Properties().apply {
     }
 }
 
+val signingRootDir = rootProject.projectDir.resolve("../..").canonicalFile
+val keystorePropertiesFile = signingRootDir.resolve("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
+}
+
+fun requiredKeystoreProperty(name: String): String {
+    return keystoreProperties.getProperty(name)
+        ?: error("Missing required Android signing property: $name in ${keystorePropertiesFile.path}")
+}
+
+fun resolveSigningFile(path: String): File {
+    val file = File(path)
+    return if (file.isAbsolute) file else signingRootDir.resolve(path)
+}
+
 android {
     compileSdk = 35
     buildToolsVersion = "36.1.0"
     namespace = "com.stone.manager"
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                storeFile = resolveSigningFile(requiredKeystoreProperty("storeFile"))
+                storePassword = requiredKeystoreProperty("storePassword")
+                keyAlias = requiredKeystoreProperty("keyAlias")
+                keyPassword = requiredKeystoreProperty("keyPassword")
+            }
+        }
+    }
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
         applicationId = "com.stone.manager"
@@ -39,6 +68,9 @@ android {
         }
         getByName("release") {
             isMinifyEnabled = true
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }
                     .plus(getDefaultProguardFile("proguard-android-optimize.txt"))
