@@ -286,7 +286,8 @@ class StoneBluetoothPlugin(private val hostActivity: Activity) : Plugin(hostActi
       addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
     }
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-      hostActivity.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+      // Android 13+ delivers Bluetooth broadcasts from a privileged framework app.
+      hostActivity.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
     } else {
       @Suppress("DEPRECATION")
       hostActivity.registerReceiver(receiver, filter)
