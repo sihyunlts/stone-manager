@@ -1,8 +1,12 @@
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+#[cfg(target_os = "android")]
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+#[cfg(target_os = "android")]
+use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
 #[cfg(target_os = "android")]
@@ -222,14 +226,66 @@ fn back_log(source: &str, message: String) {
 static APP_HANDLE: OnceCell<AppHandle> = OnceCell::new();
 static PARSERS: OnceCell<Mutex<HashMap<String, GaiaParser>>> = OnceCell::new();
 static CONNECT_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
+#[cfg(target_os = "android")]
+static CONNECT_CANCELLED: OnceCell<Mutex<HashSet<String>>> = OnceCell::new();
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 static TRAY: OnceCell<TrayIcon<Wry>> = OnceCell::new();
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 static TRAY_BATTERY_ITEM: OnceCell<MenuItem<Wry>> = OnceCell::new();
 
+#[cfg(target_os = "android")]
+const ANDROID_CONNECT_RETRY_DELAY_MS: u64 = 6_000;
+#[cfg(target_os = "android")]
+const ANDROID_CONNECT_MAX_RETRIES: u32 = 30;
+
 fn get_parsers() -> &'static Mutex<HashMap<String, GaiaParser>> {
     PARSERS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+#[cfg(target_os = "android")]
+fn get_connect_cancelled() -> &'static Mutex<HashSet<String>> {
+    CONNECT_CANCELLED.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+#[cfg(target_os = "android")]
+fn clear_connect_cancel(address: &str) {
+    if let Ok(mut cancelled) = get_connect_cancelled().lock() {
+        cancelled.remove(address);
+    }
+}
+
+#[cfg(target_os = "android")]
+fn request_connect_cancel(address: &str) {
+    if let Ok(mut cancelled) = get_connect_cancelled().lock() {
+        cancelled.insert(address.to_string());
+    }
+}
+
+#[cfg(target_os = "android")]
+fn is_connect_cancelled(address: &str) -> bool {
+    get_connect_cancelled()
+        .lock()
+        .map(|cancelled| cancelled.contains(address))
+        .unwrap_or(false)
+}
+
+#[cfg(target_os = "android")]
+fn should_retry_android_connect(error: &str) -> bool {
+    let normalized = error.to_ascii_lowercase();
+    if normalized.contains("permission denied")
+        || normalized.contains("pairing was cancelled")
+        || normalized.contains("pairing timed out")
+        || normalized.contains("failed to start pairing")
+        || normalized.contains("invalid bluetooth address")
+        || normalized.contains("connect cancelled")
+    {
+        return false;
+    }
+
+    normalized.contains("rfcomm connection failed")
+        || normalized.contains("socket might closed")
+        || normalized.contains("read failed")
 }
 
 pub(crate) fn handle_backend_data(address: &str, data: &[u8]) {
@@ -472,7 +528,56 @@ async fn connect_device_inner(address: String) -> Result<(), String> {
 #[cfg(target_os = "android")]
 async fn connect_device_inner(app: AppHandle, address: String) -> Result<(), String> {
     back_log("RUST", format!("Connect request: {}", address));
-    android_backend::connect_device(&app, &address).await
+    clear_connect_cancel(&address);
+
+    let mut retry_count = 0u32;
+    loop {
+        if is_connect_cancelled(&address) {
+            clear_connect_cancel(&address);
+            return Err("Connect cancelled".to_string());
+        }
+
+        match android_backend::connect_device(&app, &address).await {
+            Ok(()) => {
+                if is_connect_cancelled(&address) {
+                    let _ = android_backend::disconnect_device(&app, &address).await;
+                    clear_connect_cancel(&address);
+                    return Err("Connect cancelled".to_string());
+                }
+                clear_connect_cancel(&address);
+                return Ok(());
+            }
+            Err(err) => {
+                if is_connect_cancelled(&address) {
+                    clear_connect_cancel(&address);
+                    return Err("Connect cancelled".to_string());
+                }
+
+                if retry_count < ANDROID_CONNECT_MAX_RETRIES && should_retry_android_connect(&err) {
+                    retry_count += 1;
+                    back_log(
+                        "RUST",
+                        format!(
+                            "Retrying connect for {} in {} ms ({}/{})",
+                            address,
+                            ANDROID_CONNECT_RETRY_DELAY_MS,
+                            retry_count,
+                            ANDROID_CONNECT_MAX_RETRIES
+                        ),
+                    );
+                    tauri::async_runtime::spawn_blocking(|| {
+                        std::thread::sleep(Duration::from_millis(ANDROID_CONNECT_RETRY_DELAY_MS));
+                    })
+                    .await
+                    .map_err(|_| "Join error".to_string())?;
+                    continue;
+                }
+
+                clear_connect_cancel(&address);
+                return Err(err);
+            }
+        }
+    }
 }
 
 #[tauri::command]
@@ -515,6 +620,7 @@ async fn disconnect_device(_app: AppHandle, address: String) -> Result<(), Strin
     #[cfg(target_os = "android")]
     {
         back_log("RUST", format!("Disconnect request: {}", address));
+        request_connect_cancel(&address);
         android_backend::disconnect_device(&_app, &address).await
     }
 

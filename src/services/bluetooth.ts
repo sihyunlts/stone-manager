@@ -185,6 +185,8 @@ export function initConnectController(deps: ConnectControllerDeps) {
       ? connectInFlight
       : null;
     const cachedName = devices.find((d) => isSameAddress(d.address, result.address))?.name;
+    const message = result.error ?? "Connect failed";
+    const cancelled = message === "Connect cancelled";
 
     if (result.ok) {
       setDeviceConnected(result.address);
@@ -211,14 +213,15 @@ export function initConnectController(deps: ConnectControllerDeps) {
         deps.logLine(`Connected to ${resolvedName}`, "SYS");
       }
     } else {
-      const message = result.error ?? "Connect failed";
-      setDeviceDisconnected(result.address, { lastError: message });
+      setDeviceDisconnected(result.address, { lastError: cancelled ? null : message });
       suppressedAutoPairedToastAddresses.delete(normalizeAddress(result.address));
 
       if (registerPending && isSameAddress(registerPending, result.address)) {
-        deps.logLine(message, "SYS");
         registerPending = null;
-      } else if (!current?.quiet) {
+        if (!cancelled) {
+          deps.logLine(message, "SYS");
+        }
+      } else if (!current?.quiet && !cancelled) {
         deps.logLine(message, "SYS");
       }
     }
